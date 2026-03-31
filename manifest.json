@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "ThreadVault",
+  "version": "1.0.0",
+  "description": "Capture and organize Reddit threads with a sidebar panel.",
+  "icons": {
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "sidePanel",
+    "storage"
+  ],
+  "host_permissions": [
+    "*://www.reddit.com/*",
+    "*://reddit.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://www.reddit.com/*",
+        "*://reddit.com/*"
+      ],
+      "js": [
+        "content.js"
+      ]
+    }
+  ],
+  "side_panel": {
+    "default_path": "sidebar.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "ThreadVault"
+  }
+}

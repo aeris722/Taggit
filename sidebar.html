@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ThreadVault</title>
+    <link rel="stylesheet" href="sidebar.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header class="header">
+        <h1>ThreadVault</h1>
+        <p>Tag Reddit conversations and keep them organized.</p>
+      </header>
+
+      <section class="card">
+        <h2>Add Tag</h2>
+        <div id="contextPreview" class="context-preview">No conversation selected yet.</div>
+
+        <form id="tagForm" class="tag-form">
+          <label for="tagInput">Tag</label>
+          <div class="row">
+            <input id="tagInput" type="text" placeholder="e.g. follow-up, lead, support" required />
+            <button type="submit">Save</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card">
+        <div class="list-header">
+          <h2>Tagged Conversations</h2>
+          <button id="clearAllBtn" class="ghost-btn" type="button">Clear All</button>
+        </div>
+        <ul id="taggedList" class="tagged-list"></ul>
+      </section>
+    </main>
+
+    <script src="sidebar.js"></script>
+  </body>
+</html>
