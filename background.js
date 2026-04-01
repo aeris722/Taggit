@@ -5,26 +5,14 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!message || message.type !== "THREADVAULT_OPEN_SIDEBAR") {
-    return false;
-  }
+  if (!message || message.type !== "THREADVAULT_OPEN_SIDEBAR") return false;
 
-  const tabId = sender.tab && typeof sender.tab.id === "number" ? sender.tab.id : null;
-  if (tabId === null) {
-    sendResponse({ ok: false, error: "No sender tab available." });
-    return false;
-  }
+  const tabId = sender.tab?.id ?? null;
+  if (tabId === null) { sendResponse({ ok: false }); return false; }
 
   const context = {
-    page: message.context?.page || message.context?.url || "",
-    conversationText:
-      message.context?.conversationText ||
-      message.context?.label ||
-      message.context?.username ||
-      "",
-    conversationHref: message.context?.conversationHref || message.context?.url || "",
-    roomId: message.context?.roomId || "",
-    username: message.context?.username || "",
+    username: message.username || "Unknown",
+    href: message.href || "",
     updatedAt: Date.now()
   };
 
@@ -32,12 +20,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     .set({ [CONTEXT_KEY]: context })
     .then(() => chrome.sidePanel.open({ tabId }))
     .then(() => sendResponse({ ok: true }))
-    .catch((error) => {
-      sendResponse({
-        ok: false,
-        error: error && error.message ? error.message : "Failed to open side panel."
-      });
-    });
+    .catch(() => sendResponse({ ok: false }));
 
   return true;
 });

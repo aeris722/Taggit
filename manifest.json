@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "ThreadVault",
+  "name": "Reddit Tags",
   "version": "1.0.0",
-  "description": "Capture and organize Reddit threads with a sidebar panel.",
+  "description": "Tag and organize your Reddit conversations.",
   "icons": {
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
@@ -33,6 +33,6 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "ThreadVault"
+    "default_title": "Reddit Tags"
   }
 }

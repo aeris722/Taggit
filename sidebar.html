@@ -3,38 +3,49 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ThreadVault</title>
+    <title>Reddit Tags</title>
     <link rel="stylesheet" href="sidebar.css" />
   </head>
   <body>
     <main class="container">
+
       <header class="header">
-        <h1>ThreadVault</h1>
-        <p>Tag Reddit conversations and keep them organized.</p>
+        
+        <div class="header-text">
+          <h1>Reddit Tags</h1>
+          <p>Tag and organize your Reddit conversations.</p>
+        </div>
       </header>
 
       <section class="card">
-        <h2>Add Tag</h2>
+        <span class="card-title">Add Tag</span>
         <div id="contextPreview" class="context-preview">No conversation selected yet.</div>
 
         <form id="tagForm" class="tag-form">
-          <label for="tagInput">Tag</label>
+          <label>Color</label>
+          <div id="colorPicker"></div>
+
+          <label for="tagInput">Tag Label</label>
           <div class="row">
-            <input id="tagInput" type="text" placeholder="e.g. follow-up, lead, support" required />
+            <input id="tagInput" type="text" placeholder="e.g. friend, work, follow-up" required />
             <button type="submit">Save</button>
           </div>
+
+          <label for="descInput">Description</label>
+          <textarea id="descInput" placeholder="Add notes about this person..."></textarea>
         </form>
       </section>
 
       <section class="card">
         <div class="list-header">
-          <h2>Tagged Conversations</h2>
+          <span class="card-title">Tagged Conversations</span>
           <button id="clearAllBtn" class="ghost-btn" type="button">Clear All</button>
         </div>
+        <input id="filterInput" type="text" placeholder="Filter by tag or username..." />
         <ul id="taggedList" class="tagged-list"></ul>
       </section>
-    </main>
 
+    </main>
     <script src="sidebar.js"></script>
   </body>
 </html>
