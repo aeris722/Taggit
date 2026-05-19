@@ -109,27 +109,11 @@ Reddit Tags stores all data **locally on your device** using Chrome's built-in s
 | Storage | chrome.storage.local |
 | UI | HTML + CSS (DM Sans font) |
 | Architecture | Shadow DOM traversal |
-
----
-
-## 🗺️ Roadmap
-
-- [x] Phase 1 — Tag Reddit DM conversations
-- [ ] Phase 2 — AI-powered chat summarization
-- [ ] Phase 3 — Export tagged conversations to Notion
-- [ ] Phase 4 — Cloud sync across devices
-
 ---
 
 ## 🤝 Contributing
 
 Pull requests are welcome! If you find a bug or have a feature request, please open an issue on GitHub.
-
----
-
-## ⚠️ Disclaimer
-
-Reddit Tags is an independent project and is not affiliated with, endorsed by, or connected to Reddit Inc. in any way. This extension is built for personal productivity purposes only.
 
 ---
 
