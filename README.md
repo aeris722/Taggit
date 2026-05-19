@@ -1,12 +1,12 @@
-# 🏷️ Tagit
+# 🏷️ Taggit
 
 > Tag, organize, and remember every Reddit conversation — right inside your browser.
 
 ---
 
-## What is Tagit?
+## What is Taggit?
 
-Tagit is a free Chrome extension that lets you add color-coded tags and personal notes to your Reddit DM conversations. Never forget who someone is, what you talked about, or why they matter — all without leaving Reddit.
+Taggit is a free Chrome extension that lets you add color-coded tags and personal notes to your Reddit DM conversations. Never forget who someone is, what you talked about, or why they matter — all without leaving Reddit.
 
 ---
 
