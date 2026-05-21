@@ -18,7 +18,6 @@ const els = {
   clearAllBtn:    document.getElementById("clearAllBtn"),
   colorPicker:    document.getElementById("colorPicker"),
   descInput:      document.getElementById("descInput"),
-  descInput:      document.getElementById("descInput"),
   filterInput:    document.getElementById("filterInput"),
 };
 
@@ -46,46 +45,136 @@ function buildColorPicker() {
 }
 
 // --- Render ---
-function formatDate(ts) { return new Date(ts).toLocaleString(); }
-function esc(v) {
-  return v.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");
+function formatDate(ts) {
+  return new Date(ts).toLocaleString();
+}
+
+function appendText(parent, text) {
+  parent.appendChild(document.createTextNode(text));
+}
+
+function createLink(href, text, className = "") {
+  const link = document.createElement("a");
+  link.href = href;
+  link.target = "_blank";
+  link.rel = "noreferrer";
+  link.textContent = text;
+  if (className) link.className = className;
+  return link;
+}
+
+function isValidUrl(value) {
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function renderContext() {
+  els.contextPreview.replaceChildren();
+
   if (!currentContext) {
     els.contextPreview.textContent = "No conversation selected yet.";
-  } else {
-    els.contextPreview.innerHTML = currentContext.href
-      ? `@${esc(currentContext.username)} &nbsp;<a href="${esc(currentContext.href)}" target="_blank" style="color:#8dc1ff;font-size:11px;">Open chat ↗</a>`
-      : `@${esc(currentContext.username)}`;
-  }
-}
-
-function renderList() {
-  const filtered = taggedConversations
-    .slice()
-    .sort((a, b) => b.createdAt - a.createdAt)
-    .filter(item => !filterText || item.tag.toLowerCase().includes(filterText.toLowerCase()) || (item.username||"").toLowerCase().includes(filterText.toLowerCase()));
-
-  if (!filtered.length) {
-    els.list.innerHTML = '<li class="empty">No tagged conversations yet.</li>';
     return;
   }
 
-  els.list.innerHTML = filtered.map(item => `
-    <li class="tagged-item" data-id="${item.id}">
-      <div class="tagged-top">
-        <span class="tag-pill" style="background:${esc(item.color||'#ff4500')}">${esc(item.tag)}</span>
-        <span class="date">${formatDate(item.createdAt)}</span>
-      </div>
-      <p class="username">@${esc(item.username || "Unknown")}</p>
-      ${item.description ? `<p class="desc">${esc(item.description)}</p>` : ""}
-      ${item.href ? `<a class="link" href="${esc(item.href)}" target="_blank" rel="noreferrer">Open chat ↗</a>` : ""}
-      <div class="item-actions">
-        <button class="delete-btn" type="button" data-action="delete" data-id="${item.id}">Delete</button>
-      </div>
-    </li>
-  `).join("");
+  appendText(els.contextPreview, `@${currentContext.username || "Unknown"} `);
+  if (currentContext.href && isValidUrl(currentContext.href)) {
+    els.contextPreview.appendChild(createLink(currentContext.href, "Open chat"));
+  }
+}
+
+function renderEmpty(message) {
+  const empty = document.createElement("li");
+  empty.className = "empty";
+  empty.textContent = message;
+  els.list.replaceChildren(empty);
+}
+
+function createTaggedItem(item) {
+  const listItem = document.createElement("li");
+  listItem.className = "tagged-item";
+  listItem.dataset.id = item.id;
+
+  const top = document.createElement("div");
+  top.className = "tagged-top";
+
+  const pill = document.createElement("span");
+  pill.className = "tag-pill";
+  pill.style.background = item.color || "#ff4500";
+  pill.textContent = item.tag;
+
+  const date = document.createElement("span");
+  date.className = "date";
+  date.textContent = formatDate(item.createdAt);
+
+  top.append(pill, date);
+
+  const username = document.createElement("p");
+  username.className = "username";
+  username.textContent = `@${item.username || "Unknown"}`;
+
+  listItem.append(top, username);
+
+  if (item.description) {
+    const desc = document.createElement("p");
+    desc.className = "desc";
+    desc.textContent = item.description;
+    listItem.appendChild(desc);
+  }
+
+  if (item.href && isValidUrl(item.href)) {
+    listItem.appendChild(createLink(item.href, "Open chat", "link"));
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "item-actions";
+
+  const deleteButton = document.createElement("button");
+  deleteButton.className = "delete-btn";
+  deleteButton.type = "button";
+  deleteButton.dataset.action = "delete";
+  deleteButton.dataset.id = item.id;
+  deleteButton.textContent = "Delete";
+
+  actions.appendChild(deleteButton);
+  listItem.appendChild(actions);
+
+  return listItem;
+}
+
+function getFilteredConversations() {
+  const query = filterText.trim().toLowerCase();
+
+  return taggedConversations
+    .slice()
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .filter((item) => {
+      if (!query) return true;
+      return [
+        item.tag,
+        item.username,
+        item.description,
+      ].some((value) => (value || "").toLowerCase().includes(query));
+    });
+}
+
+function renderList() {
+  const filtered = getFilteredConversations();
+
+  if (!taggedConversations.length) {
+    renderEmpty("No tagged conversations yet.");
+    return;
+  }
+
+  if (!filtered.length) {
+    renderEmpty("No tags match your filter.");
+    return;
+  }
+
+  els.list.replaceChildren(...filtered.map(createTaggedItem));
 }
 
 // --- Load / Save ---

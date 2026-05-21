@@ -1,6 +1,8 @@
 const BUTTON_CLASS = "threadvault-tag-btn";
 const BUTTON_ATTR = "data-threadvault-btn";
 const CHAIN_POLL_MS = 1000;
+const TAGS_KEY = "threadVaultTaggedConversations";
+const DEFAULT_TAG_COLOR = "#ff8c00";
 
 function isTargetPage() {
   const host = window.location.hostname || "";
@@ -14,13 +16,31 @@ class RedditChatTagInjector {
     this.scheduled = false;
     this.observedRoots = new WeakSet();
     this.observedRooms = new WeakSet();
+    this.taggedConversations = [];
     this.start();
   }
 
   start() {
+    this.loadTags();
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== "local" || !changes[TAGS_KEY]) return;
+      this.taggedConversations = this.normalizeTags(changes[TAGS_KEY].newValue);
+      this.scheduleScan();
+    });
+
     this.observeRoot(document.documentElement);
     this.scheduleScan();
     setInterval(() => this.scheduleScan(), CHAIN_POLL_MS);
+  }
+
+  async loadTags() {
+    const data = await chrome.storage.local.get(TAGS_KEY);
+    this.taggedConversations = this.normalizeTags(data[TAGS_KEY]);
+    this.scheduleScan();
+  }
+
+  normalizeTags(value) {
+    return Array.isArray(value) ? value : [];
   }
 
   observeRoot(rootNode) {
@@ -77,13 +97,24 @@ class RedditChatTagInjector {
       .replace(/\s*\(.*\)\s*$/, "")
       .trim();
 
-    // Fix href — use full absolute URL
     const rawHref = anchor.getAttribute("href") || "";
-    const href = rawHref.startsWith("http")
-      ? rawHref
-      : `https://www.reddit.com/chat${rawHref}`;
+    const href = rawHref ? new URL(rawHref, window.location.origin).href : "";
 
     return { username: username || ariaLabel, href };
+  }
+
+  updateButton(button, root) {
+    const { username } = this.getContext(root);
+    const existing = this.taggedConversations.find((tag) => tag.username === username);
+
+    if (existing) {
+      button.textContent = existing.tag;
+      button.style.background = existing.color || DEFAULT_TAG_COLOR;
+      return;
+    }
+
+    button.textContent = "Tag";
+    button.style.background = DEFAULT_TAG_COLOR;
   }
 
   ensureButton(room) {
@@ -104,7 +135,7 @@ class RedditChatTagInjector {
         right: "8px",
         top: "50%",
         transform: "translateY(-50%)",
-        background: "#ff8c00",
+        background: DEFAULT_TAG_COLOR,
         color: "#111",
         border: "none",
         borderRadius: "9999px",
@@ -129,19 +160,7 @@ class RedditChatTagInjector {
       target.appendChild(button);
     }
 
-    // Update button label if this username is already tagged
-    chrome.storage.local.get(['threadVaultTaggedConversations'], (data) => {
-      const tags = data.threadVaultTaggedConversations || [];
-      const { username } = this.getContext(root);
-      const existing = tags.find(t => t.username === username);
-      if (existing) {
-        button.textContent = existing.tag;
-        button.style.background = existing.color || "#ff8c00";
-      } else {
-        button.textContent = "Tag";
-        button.style.background = "#ff8c00";
-      }
-    });
+    this.updateButton(button, root);
 
     if (window.getComputedStyle(target).position === "static") {
       target.style.position = "relative";
