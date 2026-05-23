@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Taggit</title>
+    <link rel="stylesheet" href="sidebar.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header class="header">
+        <div class="header-text">
+          <h1>Taggit</h1>
+          <p>Tag and organize your Reddit conversations.</p>
+        </div>
+      </header>
+
+      <section class="card">
+        <div class="section-heading">
+          <span class="card-title">Conversation</span>
+          <span id="formMode" class="subtle-text">Select a chat</span>
+        </div>
+        <div id="contextPreview" class="context-preview" aria-live="polite">No conversation selected yet.</div>
+
+        <form id="tagForm" class="tag-form">
+          <label id="colorPickerLabel">Color</label>
+          <div id="colorPicker" role="radiogroup" aria-labelledby="colorPickerLabel"></div>
+
+          <label for="tagInput">Tag Label</label>
+          <div class="row">
+            <input id="tagInput" type="text" placeholder="e.g. friend, work, follow-up" maxlength="28" required />
+            <button id="saveBtn" type="submit">Save</button>
+          </div>
+
+          <label for="descInput">Description</label>
+          <textarea id="descInput" placeholder="Add notes about this person..." maxlength="240"></textarea>
+          <div class="form-footer">
+            <button id="resetFormBtn" class="text-btn" type="button">Reset</button>
+            <span id="saveStatus" class="status-text" role="status" aria-live="polite"></span>
+          </div>
+        </form>
+      </section>
+
+      <section class="card">
+        <div class="section-heading">
+          <span class="card-title">AI Summary</span>
+          <span id="summaryStatus" class="subtle-text" role="status" aria-live="polite"></span>
+        </div>
+        <label for="apiKeyInput">Gemini API Key</label>
+        <input id="apiKeyInput" type="password" placeholder="Paste your Gemini API key" autocomplete="off" />
+        <div class="summary-actions">
+          <button id="saveApiKeyBtn" class="ghost-btn" type="button">Save Key</button>
+          <button id="summarizeBtn" type="button">Summarize</button>
+        </div>
+        <div id="summaryOutput" class="summary-output" tabindex="0">No summary yet.</div>
+      </section>
+
+      <section class="card">
+        <div class="list-header">
+          <div>
+            <span class="card-title">Tagged Conversations</span>
+            <span id="listCount" class="subtle-text"></span>
+          </div>
+          <button id="clearAllBtn" class="ghost-btn" type="button">Clear All</button>
+        </div>
+        <div class="filter-row">
+          <input id="filterInput" type="search" placeholder="Filter by tag, username, or note..." aria-label="Filter tagged conversations" />
+          <button id="clearFilterBtn" class="icon-btn" type="button" aria-label="Clear filter">x</button>
+        </div>
+        <ul id="taggedList" class="tagged-list"></ul>
+      </section>
+    </main>
+    <script src="../utils/constants.js"></script>
+    <script src="../utils/storage.js"></script>
+    <script src="../ai/summarize.js"></script>
+    <script src="sidebar.js"></script>
+  </body>
+</html>

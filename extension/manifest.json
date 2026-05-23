@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "Taggit",
+  "short_name": "Taggit",
+  "version": "1.0.0",
+  "description": "Tag and organize Reddit chat conversations with private notes and quick filters.",
+  "minimum_chrome_version": "114",
+  "icons": {
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "sidePanel",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://www.reddit.com/*",
+    "https://reddit.com/*",
+    "https://generativelanguage.googleapis.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.reddit.com/*",
+        "https://reddit.com/*"
+      ],
+      "js": [
+        "utils/constants.js",
+        "utils/storage.js",
+        "content/reddit-chat.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "side_panel": {
+    "default_path": "sidebar/sidebar.html"
+  },
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "action": {
+    "default_title": "Taggit",
+    "default_icon": {
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  }
+}
