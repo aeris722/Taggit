@@ -1,126 +1,118 @@
-# 🏷️ Taggit
+# Taggit
 
-> Tag, organize, and remember every Reddit conversation — right inside your browser.
+Taggit is a lightweight Chrome Extension that helps you tag, remember, and quickly find Reddit chat conversations.
 
----
+Built for Manifest V3 with plain JavaScript, HTML, and CSS. No React, no build step, no backend, and no account required.
 
-## What is Taggit?
+## Status
 
-Taggit is a free Chrome extension that lets you add color-coded tags and personal notes to your Reddit DM conversations. Never forget who someone is, what you talked about, or why they matter — all without leaving Reddit.
+Version 1 is focused on a stable, useful MVP:
 
----
+- Fast Reddit chat tagging
+- Private local notes
+- Filtering and quick lookup
+- Chrome Side Panel support
+- A simple foundation for future AI summaries
 
-## ✨ Features
+## Features
 
-- 🏷️ **One-click tagging** — Tag any Reddit DM conversation directly from the chat list
-- 🎨 **Color-coded tags** — Choose from 6 pastel colors to visually organize contacts
-- 📝 **Personal descriptions** — Add private notes about each person
-- 🔍 **Filter & search** — Instantly filter tagged conversations by tag name or username
-- 🔗 **Quick access** — Jump back to any conversation with a single click
-- 💾 **Local storage** — All data stays on your device, completely private
-- 🚫 **No account needed** — Install and use immediately
+- Add color-coded tags to Reddit chat conversations
+- Save short private notes for each conversation
+- Update an existing tag instead of creating duplicates
+- Filter saved chats by tag, username, or note
+- Summarize the active Reddit chat with your own Gemini API key
+- Open saved conversations directly from the sidebar
+- Store data locally with `chrome.storage.local`
+- Runs only on Reddit chat pages
 
----
+## Screenshots
 
-## 📦 Installation (Developer Mode)
+Add Chrome Web Store screenshots here before publishing:
 
-Since this extension is not yet on the Chrome Web Store, follow these steps to install it manually.
+```text
+docs/screenshots/sidebar.png
+docs/screenshots/reddit-chat-tag-button.png
+docs/screenshots/filtering.png
+```
 
-### Step 1 — Download the extension
+## Install Locally
 
-1. Go to the GitHub repository page
-2. Click the green **Code** button
-3. Click **Download ZIP**
-4. Extract the ZIP file anywhere on your computer (e.g. Desktop)
+1. Open Chrome.
+2. Go to `chrome://extensions`.
+3. Enable **Developer mode**.
+4. Click **Load unpacked**.
+5. Select the `extension/` folder.
+6. Open `https://www.reddit.com/chat/`.
 
-### Step 2 — Open Chrome Extensions
+## How To Use
 
-1. Open Google Chrome
-2. Type `chrome://extensions` in the address bar and press Enter
-3. Toggle **Developer Mode** ON using the switch in the top right corner
+1. Open Reddit Chat.
+2. Click the **Tag** button beside a conversation.
+3. Choose a color, enter a tag label, and optionally add a note.
+4. Use the sidebar search field to filter saved conversations.
+5. Paste a Gemini API key in **AI Summary** and click **Summarize** while Reddit Chat is the active tab.
 
-### Step 3 — Load the extension
+If you save a tag for the same conversation again, Taggit updates the existing saved tag.
 
-1. Click **Load Unpacked**
-2. Select the extracted folder (the one containing `manifest.json`)
-3. Reddit Tags will appear in your extensions list
+## Privacy
 
-### Step 4 — Pin it (optional but recommended)
+Taggit stores tags, notes, and your Gemini API key locally on your device using Chrome storage.
 
-1. Click the puzzle piece 🧩 icon in Chrome's toolbar
-2. Find **Reddit Tags** and click the pin 📌 icon
-3. The Reddit Tags icon will now always be visible in your toolbar
+AI summaries are optional. When you click **Summarize**, visible chat text is sent directly from your browser to the Gemini API using your own API key.
 
----
+## Architecture
 
-## 🚀 How to Use
+```text
+taggit/
+  extension/
+    manifest.json
+    ai/
+      summarize.js
+    background/
+      service-worker.js
+    content/
+      reddit-chat.js
+    sidebar/
+      sidebar.html
+      sidebar.css
+      sidebar.js
+    utils/
+      constants.js
+      storage.js
+  firebase/
+  website/
+  README.md
+```
 
-### Opening the sidebar
+## Technical Notes
 
-1. Go to [reddit.com/chat](https://www.reddit.com/chat)
-2. The sidebar will open automatically when you tag a conversation
-3. Or click the Reddit Tags icon in your toolbar to open it manually
+- Manifest V3 extension
+- Chrome Side Panel API
+- MutationObserver-first Reddit DOM injection
+- No permanent DOM polling
+- Shared storage utilities for consistent local data handling
+- Conversation identity uses chat `href` first, username fallback second
+- CSP-safe extension UI with no remote fonts or scripts
+- Optional Gemini summaries via `generativelanguage.googleapis.com`
 
-### Tagging a conversation
+## Chrome Web Store Checklist
 
-1. Open Reddit Chat at `reddit.com/chat/`
-2. You will see an orange **Tag** button next to each conversation in the left sidebar
-3. Click **Tag** on any conversation
-4. The Reddit Tags sidebar will open on the right
-5. Pick a **color** for your tag
-6. Enter a **tag label** (e.g. `friend`, `work`, `follow-up`)
-7. Optionally add a **description** or personal note
-8. Click **Save**
+- Add final screenshots
+- Add a privacy policy page
+- Confirm extension name, description, and icon
+- Test install with `extension/` as the unpacked folder
+- Test on `reddit.com/chat/` and `www.reddit.com/chat/`
+- Verify no console errors during normal use
 
-### Viewing tagged conversations
+## Roadmap
 
-All your tagged conversations appear in the **Tagged Conversations** section of the sidebar, sorted by most recent.
+- AI conversation summaries
+- Better message extraction for Reddit DOM changes
+- Optional Firebase auth support
+- Export/import local tags
+- Additional tag management controls
+- Chrome Web Store release assets
 
-Each entry shows:
-- The color-coded tag label
-- The Reddit username
-- Your personal description (if added)
-- Date and time tagged
-- A direct link to open that chat
+## Development
 
-### Filtering
-
-Use the **Filter** box to search through your tagged conversations by tag name or username in real time.
-
-### Deleting tags
-
-- Click **Delete** on any individual tag to remove it (confirmation required)
-- Click **Clear All** to remove all tags at once (confirmation required)
-
----
-
-## 🔒 Privacy
-
-Reddit Tags stores all data **locally on your device** using Chrome's built-in storage. No data is sent to any server. No account is required. Your tags are completely private.
-
----
-
-## 🛠️ Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Extension | Chrome Manifest V3 |
-| Content Script | Vanilla JavaScript |
-| Storage | chrome.storage.local |
-| UI | HTML + CSS (DM Sans font) |
-| Architecture | Shadow DOM traversal |
----
-
-## 🤝 Contributing
-
-Pull requests are welcome! If you find a bug or have a feature request, please open an issue on GitHub.
-
----
-
-## 📄 License
-
-MIT License — free to use, modify, and distribute.
-
----
-
-Made with ❤️ for the Reddit community
+This project intentionally avoids a build system for now. Edit the files directly in `extension/`, then reload the unpacked extension in Chrome.
