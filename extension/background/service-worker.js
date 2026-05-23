@@ -1,4 +1,4 @@
-importScripts("/utils/constants.js", "/utils/storage.js");
+importScripts("../utils/constants.js", "../utils/storage.js");
 
 const { MESSAGE_TYPES } = globalThis.TaggitConstants;
 const { getConversationId, getSafeChatHref, saveContext } = globalThis.TaggitStorage;
