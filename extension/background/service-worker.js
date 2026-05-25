@@ -1,7 +1,7 @@
 importScripts("../utils/constants.js", "../utils/storage.js");
 
 const { MESSAGE_TYPES } = globalThis.TaggitConstants;
-const { getConversationId, getSafeChatHref, saveContext } = globalThis.TaggitStorage;
+const { getBestChatHref, getConversationId, getSafeChatHref, saveContext } = globalThis.TaggitStorage;
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((error) => {
@@ -15,7 +15,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message?.type === MESSAGE_TYPES.openChat) {
     const fallbackUrl = "https://www.reddit.com/chat/";
-    const url = getSafeChatHref(message.href) || fallbackUrl;
+    const url = getBestChatHref(message) || fallbackUrl;
 
     chrome.tabs
       .create({ url })
@@ -38,7 +38,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   const context = {
     username: message.username || "Unknown",
-    href: getSafeChatHref(message.href) || "https://www.reddit.com/chat/",
+    href: getBestChatHref(message),
     conversationId: message.conversationId || getConversationId(message),
     updatedAt: Date.now(),
   };

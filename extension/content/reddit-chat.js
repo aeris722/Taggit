@@ -3,6 +3,7 @@ const { createTagMap, getConversationId, getSafeChatHref } = globalThis.TaggitSt
 
 const BUTTON_CLASS = "taggit-tag-btn";
 const BUTTON_ATTR = "data-taggit-btn";
+const BUTTON_BOUND_ATTR = "data-taggit-bound";
 const STARTUP_RETRY_MS = 350;
 const MAX_STARTUP_RETRIES = 25;
 const BUTTON_RESERVED_SPACE = 76;
@@ -12,30 +13,112 @@ const SELECTORS = {
   roomsNav: "rs-rooms-nav",
   virtualScroll: "rs-virtual-scroll",
   room: "rs-rooms-nav-room",
+  chatSurface: [
+    "rs-room",
+    "rs-conversation",
+    "rs-chat-room",
+    "rs-chat",
+    "[aria-label*='Messages']",
+    "[aria-label*='messages']",
+    "main",
+  ],
+  messageCandidate: [
+    "[data-testid*='message']",
+    "[class*='message']",
+    "[part*='message']",
+    "[aria-label*='message']",
+    "li",
+    "p",
+  ],
   chatAnchor: [
     "a[aria-label*='Direct chat']",
     "a[href*='/chat/channel/']",
     "a[href*='/chat/']",
-    "a",
   ],
   injectionTarget: [
-    "[role='link']",
     "a",
+    "[role='link']",
     "[part='container']",
     "div[class*='relative']",
-    "div",
   ],
 };
 
-const MESSAGE_TEXT_SKIP_PATTERNS = [
+const JUNK_TEXT_PATTERNS = [
   /^tag$/i,
+  /^save$/i,
+  /^update$/i,
   /^open chat$/i,
   /^delete$/i,
   /^reddit$/i,
   /^search$/i,
   /^send$/i,
   /^message$/i,
+  /^type a message$/i,
+  /^online$/i,
+  /^offline$/i,
+  /^new chat$/i,
+  /^settings$/i,
+  /^premium$/i,
+  /^advertise$/i,
+  /^explore reddit communities$/i,
+  /^page not found$/i,
+  /^\d{1,2}:\d{2}\s*(am|pm)?$/i,
 ];
+
+const MESSAGE_MIN_LENGTH = 2;
+const MESSAGE_MAX_LENGTH = 1200;
+const SUMMARY_MESSAGE_LIMIT = 80;
+
+function hasExtensionContext() {
+  try {
+    return Boolean(globalThis.chrome?.runtime?.id);
+  } catch {
+    return false;
+  }
+}
+
+function isContextInvalidatedError(error) {
+  return /Extension context invalidated/i.test(String(error?.message || error || ""));
+}
+
+async function safeChromeCall(label, callback, fallback = null) {
+  if (!hasExtensionContext()) return fallback;
+
+  try {
+    return await callback();
+  } catch (error) {
+    if (!isContextInvalidatedError(error)) {
+      console.warn(`[Taggit] ${label} failed.`, error);
+    }
+    return fallback;
+  }
+}
+
+window.addEventListener("error", (event) => {
+  if (isContextInvalidatedError(event.error || event.message)) {
+    globalThis.__taggitInjector?.shutdownFromInvalidContext?.();
+    event.preventDefault();
+  }
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  if (isContextInvalidatedError(event.reason)) {
+    globalThis.__taggitInjector?.shutdownFromInvalidContext?.();
+    event.preventDefault();
+  }
+});
+
+async function sendRuntimeMessageSafe(message, retries = 1) {
+  return safeChromeCall("Runtime message", async () => {
+    try {
+      return await chrome.runtime.sendMessage(message);
+    } catch (error) {
+      if (retries <= 0) throw error;
+      await new Promise((resolve) => window.setTimeout(resolve, 100));
+      return sendRuntimeMessageSafe(message, retries - 1);
+    }
+  });
+}
 
 function isTargetPage() {
   const host = window.location.hostname || "";
@@ -69,50 +152,118 @@ function isVisibleElement(element) {
   return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
 }
 
-function collectVisibleText(root, lines = []) {
-  if (!root) return lines;
+function getDeepElements(root, selectors, results = [], options = {}) {
+  if (!root) return results;
 
-  root.childNodes.forEach((node) => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      const text = node.textContent.replace(/\s+/g, " ").trim();
-      if (
-        text.length > 1 &&
-        !MESSAGE_TEXT_SKIP_PATTERNS.some((pattern) => pattern.test(text))
-      ) {
-        lines.push(text);
-      }
-      return;
+  selectors.forEach((selector) => {
+    try {
+      root.querySelectorAll(selector).forEach((element) => results.push(element));
+    } catch {
+      // Ignore Reddit selector/runtime changes.
     }
-
-    if (node.nodeType !== Node.ELEMENT_NODE) return;
-
-    const element = node;
-    if (!isVisibleElement(element)) return;
-
-    if (element.shadowRoot) {
-      collectVisibleText(element.shadowRoot, lines);
-    }
-
-    collectVisibleText(element, lines);
   });
 
-  return lines;
+  root.querySelectorAll("*").forEach((element) => {
+    if (options.skipElement?.(element)) return;
+    if (element.shadowRoot) getDeepElements(element.shadowRoot, selectors, results, options);
+  });
+
+  return results;
 }
 
-function collectChatMessages() {
-  const app = document.querySelector(SELECTORS.app);
-  const root = app?.shadowRoot || document.body;
-  const uniqueLines = [];
-  const seen = new Set();
+function getElementText(element) {
+  return (element.innerText || element.textContent || "").replace(/\s+/g, " ").trim();
+}
 
-  collectVisibleText(root).forEach((line) => {
-    const normalized = line.toLowerCase();
-    if (seen.has(normalized)) return;
-    seen.add(normalized);
-    uniqueLines.push({ author: "", text: line });
+function isJunkText(text) {
+  if (!text) return true;
+  if (text.length < MESSAGE_MIN_LENGTH || text.length > MESSAGE_MAX_LENGTH) return true;
+  if (/^[\W_]+$/u.test(text)) return true;
+  if (JUNK_TEXT_PATTERNS.some((pattern) => pattern.test(text))) return true;
+  return false;
+}
+
+function isInteractiveOrNavigation(element) {
+  const tagName = element.tagName?.toLowerCase() || "";
+  const role = element.getAttribute?.("role") || "";
+  const text = getElementText(element).toLowerCase();
+
+  if (["button", "input", "textarea", "select", "nav"].includes(tagName)) return true;
+  if (["button", "navigation", "searchbox", "textbox"].includes(role)) return true;
+  if (text === "tag" || text === "open chat") return true;
+  return false;
+}
+
+function findConversationRoot() {
+  const app = document.querySelector(SELECTORS.app);
+  const appRoot = app?.shadowRoot || document.body;
+  const surfaces = getDeepElements(appRoot, SELECTORS.chatSurface, [], {
+    skipElement: (element) => element.matches?.(SELECTORS.roomsNav),
+  })
+    .filter((element) => isVisibleElement(element))
+    .filter((element) => !element.closest?.(SELECTORS.roomsNav));
+
+  return surfaces.sort((a, b) => getElementText(b).length - getElementText(a).length)[0] || appRoot;
+}
+
+function inferAuthor(element, fallbackUsername = "") {
+  const container = element.closest?.("[data-author], [author], [aria-label], [data-testid*='message']");
+  const directAuthor =
+    container?.getAttribute?.("data-author") ||
+    container?.getAttribute?.("author") ||
+    "";
+  const ariaLabel = container?.getAttribute?.("aria-label") || "";
+  const ariaAuthor = ariaLabel.match(/(?:from|by)\s+([^,]+)/i)?.[1] || "";
+  return (directAuthor || ariaAuthor || fallbackUsername || "Unknown").trim();
+}
+
+function getActiveRoomContext() {
+  const selected =
+    document.querySelector(`${SELECTORS.room}[aria-selected='true']`) ||
+    document.querySelector(`${SELECTORS.room}[active]`);
+
+  if (selected?.shadowRoot) {
+    const injector = globalThis.__taggitInjector;
+    return injector?.getContext?.(selected.shadowRoot) || {};
+  }
+
+  return {};
+}
+
+function extractConversation() {
+  const root = findConversationRoot();
+  const context = getActiveRoomContext();
+  const candidates = getDeepElements(root, SELECTORS.messageCandidate, [], {
+    skipElement: (element) => element.matches?.(SELECTORS.roomsNav),
+  })
+    .filter((element) => isVisibleElement(element))
+    .filter((element) => !isInteractiveOrNavigation(element));
+  const seen = new Set();
+  const messages = [];
+
+  candidates.forEach((element) => {
+    const text = getElementText(element);
+    if (isJunkText(text)) return;
+
+    const key = text.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+
+    messages.push({
+      author: inferAuthor(element, context.username),
+      text,
+      timestamp: element.querySelector?.("time")?.getAttribute("datetime") || null,
+    });
   });
 
-  return uniqueLines.slice(-80);
+  const cleanMessages = messages.slice(-SUMMARY_MESSAGE_LIMIT);
+  const participants = [...new Set(cleanMessages.map((message) => message.author).filter(Boolean))];
+
+  return {
+    roomId: context.conversationId || getConversationId(context) || window.location.href,
+    participants,
+    messages: cleanMessages,
+  };
 }
 
 class RedditChatTagInjector {
@@ -125,6 +276,7 @@ class RedditChatTagInjector {
     this.observedRoots = new WeakSet();
     this.observedRooms = new WeakSet();
     this.tagMap = new Map();
+    this.instanceId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     this.onStorageChanged = this.handleStorageChange.bind(this);
     this.start();
   }
@@ -132,7 +284,9 @@ class RedditChatTagInjector {
   start() {
     this.loadTags();
     this.observeRoot(document.documentElement);
-    chrome.storage.onChanged.addListener(this.onStorageChanged);
+    if (hasExtensionContext()) {
+      chrome.storage.onChanged.addListener(this.onStorageChanged);
+    }
     this.scheduleScan();
     this.scheduleStartupRetry();
   }
@@ -140,9 +294,19 @@ class RedditChatTagInjector {
   stop() {
     this.active = false;
     window.clearTimeout(this.retryTimer);
-    chrome.storage.onChanged.removeListener(this.onStorageChanged);
+    if (hasExtensionContext()) {
+      chrome.storage.onChanged.removeListener(this.onStorageChanged);
+    }
     this.observers.forEach((observer) => observer.disconnect());
     this.observers = [];
+  }
+
+  shutdownFromInvalidContext() {
+    try {
+      this.stop();
+    } catch {
+      this.active = false;
+    }
   }
 
   handleStorageChange(changes, area) {
@@ -156,20 +320,24 @@ class RedditChatTagInjector {
   }
 
   async loadTags() {
-    try {
+    return safeChromeCall("Load tags", async () => {
       const data = await chrome.storage.local.get(TAGGIT_KEYS.tags);
       this.tagMap = createTagMap(data[TAGGIT_KEYS.tags]);
       this.scheduleScan();
-    } catch (error) {
-      console.warn("[Taggit] Failed to load tags.", error);
-    }
+    });
   }
 
   observeRoot(rootNode) {
     if (!rootNode || this.observedRoots.has(rootNode)) return;
 
     this.observedRoots.add(rootNode);
-    const observer = new MutationObserver(() => this.scheduleScan());
+    const observer = new MutationObserver(() => {
+      try {
+        this.scheduleScan();
+      } catch (error) {
+        if (isContextInvalidatedError(error)) this.shutdownFromInvalidContext();
+      }
+    });
     observer.observe(rootNode, { childList: true, subtree: true });
     this.observers.push(observer);
   }
@@ -179,27 +347,40 @@ class RedditChatTagInjector {
 
     window.clearTimeout(this.retryTimer);
     this.retryTimer = window.setTimeout(() => {
-      if (!this.active) return;
-      this.retryCount += 1;
-      if (!this.scanAndInject()) {
-        this.scheduleStartupRetry();
+      try {
+        if (!this.active) return;
+        this.retryCount += 1;
+        if (!this.scanAndInject()) {
+          this.scheduleStartupRetry();
+        }
+      } catch (error) {
+        if (isContextInvalidatedError(error)) this.shutdownFromInvalidContext();
       }
     }, STARTUP_RETRY_MS);
   }
 
   scheduleScan() {
-    if (!this.active || this.scheduled || !isTargetPage()) return;
+    if (!this.active || this.scheduled || !hasExtensionContext() || !isTargetPage()) return;
 
     this.scheduled = true;
     requestAnimationFrame(() => {
-      if (!this.active) return;
-      this.scheduled = false;
-      this.scanAndInject();
+      try {
+        if (!this.active || !hasExtensionContext()) return;
+        this.scheduled = false;
+        this.scanAndInject();
+      } catch (error) {
+        this.scheduled = false;
+        if (isContextInvalidatedError(error)) {
+          this.shutdownFromInvalidContext();
+          return;
+        }
+        console.warn("[Taggit] Scan frame failed.", error);
+      }
     });
   }
 
   scanAndInject() {
-    if (!this.active || !isTargetPage()) return false;
+    if (!this.active || !hasExtensionContext() || !isTargetPage()) return false;
 
     try {
       const virtualScroll = this.findRoomsRoot();
@@ -209,25 +390,34 @@ class RedditChatTagInjector {
       rooms.forEach((room) => this.prepareRoom(room));
       return rooms.length > 0;
     } catch (error) {
+      if (isContextInvalidatedError(error)) {
+        this.shutdownFromInvalidContext();
+        return false;
+      }
       console.warn("[Taggit] Failed to scan Reddit chat DOM.", error);
       return false;
     }
   }
 
   findRoomsRoot() {
-    const app = document.querySelector(SELECTORS.app);
-    if (!app?.shadowRoot) return null;
-    this.observeRoot(app.shadowRoot);
+    try {
+      const app = document.querySelector(SELECTORS.app);
+      if (!app?.shadowRoot) return null;
+      this.observeRoot(app.shadowRoot);
 
-    const roomsNav = app.shadowRoot.querySelector(SELECTORS.roomsNav);
-    if (!roomsNav?.shadowRoot) return null;
-    this.observeRoot(roomsNav.shadowRoot);
+      const roomsNav = app.shadowRoot.querySelector(SELECTORS.roomsNav);
+      if (!roomsNav?.shadowRoot) return null;
+      this.observeRoot(roomsNav.shadowRoot);
 
-    const virtualScroll = roomsNav.shadowRoot.querySelector(SELECTORS.virtualScroll);
-    if (!virtualScroll?.shadowRoot) return null;
-    this.observeRoot(virtualScroll.shadowRoot);
+      const virtualScroll = roomsNav.shadowRoot.querySelector(SELECTORS.virtualScroll);
+      if (!virtualScroll?.shadowRoot) return null;
+      this.observeRoot(virtualScroll.shadowRoot);
 
-    return virtualScroll;
+      return virtualScroll;
+    } catch (error) {
+      if (isContextInvalidatedError(error)) this.shutdownFromInvalidContext();
+      return null;
+    }
   }
 
   prepareRoom(room) {
@@ -241,7 +431,13 @@ class RedditChatTagInjector {
     if (this.observedRooms.has(room)) return;
 
     this.observedRooms.add(room);
-    const observer = new MutationObserver(() => this.scheduleScan());
+    const observer = new MutationObserver(() => {
+      try {
+        this.scheduleScan();
+      } catch (error) {
+        if (isContextInvalidatedError(error)) this.shutdownFromInvalidContext();
+      }
+    });
     observer.observe(room.shadowRoot, {
       childList: true,
       subtree: true,
@@ -257,7 +453,10 @@ class RedditChatTagInjector {
 
     const ariaLabel = anchor.getAttribute("aria-label") || "";
     const rawHref = anchor.getAttribute("href") || "";
-    const href = getSafeChatHref(getAbsoluteHref(rawHref)) || "https://www.reddit.com/chat/";
+    const href =
+      getSafeChatHref(getAbsoluteHref(rawHref)) ||
+      getSafeChatHref(window.location.href) ||
+      "";
     const usernameFromLabel = ariaLabel
       .replace(/^Direct chat(?: with)?\s*/i, "")
       .replace(/\s*\(.*\)\s*$/, "")
@@ -297,11 +496,17 @@ class RedditChatTagInjector {
     if (!target) return;
 
     let button = root.querySelector(`button.${BUTTON_CLASS}[${BUTTON_ATTR}="1"]`);
+    if (button && button.getAttribute(BUTTON_BOUND_ATTR) !== this.instanceId) {
+      button.remove();
+      button = null;
+    }
+
     if (!button) {
       button = document.createElement("button");
       button.type = "button";
       button.className = BUTTON_CLASS;
       button.setAttribute(BUTTON_ATTR, "1");
+      button.setAttribute(BUTTON_BOUND_ATTR, this.instanceId);
 
       Object.assign(button.style, {
         position: "absolute",
@@ -356,15 +561,13 @@ class RedditChatTagInjector {
           updatedAt: Date.now(),
         };
 
-        chrome.storage.local.set({ [TAGGIT_KEYS.context]: selectedContext }).catch((error) => {
-          console.warn("[Taggit] Failed to save selected chat.", error);
-        });
+        safeChromeCall("Save selected chat", () =>
+          chrome.storage.local.set({ [TAGGIT_KEYS.context]: selectedContext })
+        );
 
-        chrome.runtime.sendMessage({
+        sendRuntimeMessageSafe({
           type: MESSAGE_TYPES.openSidebar,
           ...selectedContext,
-        }).catch((error) => {
-          console.warn("[Taggit] Failed to open sidebar.", error);
         });
       });
     }
@@ -409,31 +612,55 @@ function watchRedditRouteChanges() {
 }
 
 function syncInjectorWithRoute() {
-  if (isTargetPage()) {
-    if (!globalThis.__taggitInjector) {
-      globalThis.__taggitInjector = new RedditChatTagInjector();
+  try {
+    if (!hasExtensionContext()) {
+      globalThis.__taggitInjector?.stop?.();
+      globalThis.__taggitInjector = null;
+      return;
     }
-    return;
-  }
 
-  if (globalThis.__taggitInjector) {
-    globalThis.__taggitInjector.stop();
-    globalThis.__taggitInjector = null;
+    if (isTargetPage()) {
+      if (!globalThis.__taggitInjector) {
+        globalThis.__taggitInjector = new RedditChatTagInjector();
+      }
+      return;
+    }
+
+    if (globalThis.__taggitInjector) {
+      globalThis.__taggitInjector.stop();
+      globalThis.__taggitInjector = null;
+    }
+  } catch (error) {
+    if (!isContextInvalidatedError(error)) {
+      console.warn("[Taggit] Route sync failed.", error);
+    }
   }
 }
 
 watchRedditRouteChanges();
-window.addEventListener("taggit:location-change", syncInjectorWithRoute);
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type !== MESSAGE_TYPES.collectChatMessages) return false;
-
+window.addEventListener("taggit:location-change", () => {
   try {
-    sendResponse({ ok: true, messages: collectChatMessages() });
+    syncInjectorWithRoute();
   } catch (error) {
-    console.warn("[Taggit] Failed to collect chat messages.", error);
-    sendResponse({ ok: false, messages: [] });
+    if (!isContextInvalidatedError(error)) {
+      console.warn("[Taggit] Route change failed.", error);
+    }
   }
-
-  return false;
 });
+
+if (hasExtensionContext()) {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message?.type !== MESSAGE_TYPES.collectChatMessages) return false;
+
+    try {
+      const conversation = extractConversation();
+      sendResponse({ ok: true, conversation, messages: conversation.messages });
+    } catch (error) {
+      console.warn("[Taggit] Failed to collect chat messages.", error);
+      sendResponse({ ok: false, conversation: null, messages: [] });
+    }
+
+    return false;
+  });
+}
 syncInjectorWithRoute();

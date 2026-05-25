@@ -189,7 +189,9 @@ textarea::placeholder {
 
 textarea {
   min-height: 56px;
-  resize: vertical;
+  max-height: 320px;
+  overflow-y: auto;
+  resize: none;
 }
 
 .row {
@@ -461,13 +463,18 @@ button[type="submit"]:active {
   text-align: center;
 }
 
-.summary-actions {
+.summary-actions,
+.summary-feedback {
   display: flex;
   gap: 8px;
 }
 
 .summary-actions .ghost-btn,
 .summary-actions #summarizeBtn {
+  flex: 1;
+}
+
+.summary-feedback .ghost-btn {
   flex: 1;
 }
 

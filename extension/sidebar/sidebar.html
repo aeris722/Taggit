@@ -33,7 +33,7 @@
           </div>
 
           <label for="descInput">Description</label>
-          <textarea id="descInput" placeholder="Add notes about this person..." maxlength="240"></textarea>
+          <textarea id="descInput" placeholder="Add notes about this person..." maxlength="1600"></textarea>
           <div class="form-footer">
             <button id="resetFormBtn" class="text-btn" type="button">Reset</button>
             <span id="saveStatus" class="status-text" role="status" aria-live="polite"></span>
@@ -51,6 +51,11 @@
         <div class="summary-actions">
           <button id="saveApiKeyBtn" class="ghost-btn" type="button">Save Key</button>
           <button id="summarizeBtn" type="button">Summarize</button>
+        </div>
+        <div class="summary-feedback">
+          <button id="useSummaryBtn" class="ghost-btn" type="button" disabled>Use as Note</button>
+          <button id="goodSummaryBtn" class="ghost-btn" type="button" disabled>Good</button>
+          <button id="badSummaryBtn" class="ghost-btn" type="button" disabled>Bad</button>
         </div>
         <div id="summaryOutput" class="summary-output" tabindex="0">No summary yet.</div>
       </section>

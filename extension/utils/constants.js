@@ -3,6 +3,8 @@
     context: "taggitCurrentContext",
     tags: "taggitTaggedConversations",
     aiSettings: "taggitAiSettings",
+    summaries: "taggitSummaries",
+    aiExamples: "taggitAiExamples",
   };
 
   const MESSAGE_TYPES = {
@@ -13,7 +15,7 @@
 
   const LIMITS = {
     tagMaxLength: 28,
-    noteMaxLength: 240,
+    noteMaxLength: 1600,
   };
 
   const COLORS = [

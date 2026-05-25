@@ -34,6 +34,10 @@
     }
   }
 
+  function getBestChatHref(input = {}) {
+    return getSafeChatHref(input.href) || getSafeChatHref(input.conversationId);
+  }
+
   function getConversationId(input = {}) {
     const hrefId = normalizeUrl(input.href);
     if (hrefId) return hrefId;
@@ -126,6 +130,7 @@
   globalThis.TaggitStorage = {
     getConversationId,
     getSafeChatHref,
+    getBestChatHref,
     normalizeTag,
     normalizeTags,
     getState,
