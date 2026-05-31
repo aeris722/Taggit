@@ -9,11 +9,35 @@
   <body>
     <main class="container">
       <header class="header">
+        <div class="brand-mark" aria-hidden="true">T</div>
         <div class="header-text">
           <h1>Taggit</h1>
           <p>Tag and organize your Reddit conversations.</p>
         </div>
+        <div class="header-actions">
+          <button id="densityToggleBtn" class="icon-btn density-toggle" type="button" aria-label="Toggle compact density" aria-pressed="false" title="Toggle density">N</button>
+          <button id="themeToggleBtn" class="icon-btn theme-toggle" type="button" aria-label="Toggle light theme" aria-pressed="false" title="Toggle theme">D</button>
+        </div>
       </header>
+
+      <section class="stats-strip" aria-label="Tag stats">
+        <div class="stat">
+          <span id="totalStat" class="stat-value">0</span>
+          <span class="stat-label">Saved</span>
+        </div>
+        <div class="stat">
+          <span id="pinnedStat" class="stat-value">0</span>
+          <span class="stat-label">Pinned</span>
+        </div>
+        <div class="stat">
+          <span id="notesStat" class="stat-value">0</span>
+          <span class="stat-label">Notes</span>
+        </div>
+        <div class="stat">
+          <span id="uniqueStat" class="stat-value">0</span>
+          <span class="stat-label">Tags</span>
+        </div>
+      </section>
 
       <section class="card">
         <div class="section-heading">
@@ -26,14 +50,27 @@
           <label id="colorPickerLabel">Color</label>
           <div id="colorPicker" role="radiogroup" aria-labelledby="colorPickerLabel"></div>
 
-          <label for="tagInput">Tag Label</label>
+          <div class="label-row">
+            <label for="tagInput">Tag Label</label>
+            <span id="tagCharCount" class="counter">0/28</span>
+          </div>
           <div class="row">
             <input id="tagInput" type="text" placeholder="e.g. friend, work, follow-up" maxlength="28" required />
             <button id="saveBtn" type="submit">Save</button>
           </div>
+          <div id="tagSuggestions" class="suggestion-row" aria-label="Quick tag suggestions"></div>
 
-          <label for="descInput">Description</label>
+          <div class="label-row">
+            <label for="descInput">Description</label>
+            <span id="descCharCount" class="counter">0/1600</span>
+          </div>
           <textarea id="descInput" placeholder="Add notes about this person..." maxlength="1600"></textarea>
+          <div id="noteTemplates" class="suggestion-row" aria-label="Note templates">
+            <button class="suggestion-chip" type="button" data-template="Follow up: ">Follow up</button>
+            <button class="suggestion-chip" type="button" data-template="Context: ">Context</button>
+            <button class="suggestion-chip" type="button" data-template="Next step: ">Next step</button>
+            <button class="suggestion-chip" type="button" data-template="Watch for: ">Watch for</button>
+          </div>
           <div class="form-footer">
             <button id="resetFormBtn" class="text-btn" type="button">Reset</button>
             <span id="saveStatus" class="status-text" role="status" aria-live="polite"></span>
@@ -54,6 +91,7 @@
         </div>
         <div class="summary-feedback">
           <button id="useSummaryBtn" class="ghost-btn" type="button" disabled>Use as Note</button>
+          <button id="copySummaryBtn" class="ghost-btn" type="button" disabled>Copy</button>
           <button id="goodSummaryBtn" class="ghost-btn" type="button" disabled>Good</button>
           <button id="badSummaryBtn" class="ghost-btn" type="button" disabled>Bad</button>
         </div>
@@ -66,11 +104,45 @@
             <span class="card-title">Tagged Conversations</span>
             <span id="listCount" class="subtle-text"></span>
           </div>
-          <button id="clearAllBtn" class="ghost-btn" type="button">Clear All</button>
+          <div class="list-actions">
+            <button id="importTagsBtn" class="ghost-btn" type="button">Import</button>
+            <button id="exportTagsBtn" class="ghost-btn" type="button">Export</button>
+            <button id="exportCsvBtn" class="ghost-btn" type="button">CSV</button>
+            <button id="copyMarkdownBtn" class="ghost-btn" type="button">Copy MD</button>
+            <button id="clearAllBtn" class="ghost-btn danger-action" type="button">Clear All</button>
+          </div>
+        </div>
+        <input id="importFileInput" class="visually-hidden" type="file" accept="application/json,.json" />
+        <div class="control-grid">
+          <label for="sortSelect">Sort</label>
+          <select id="sortSelect" aria-label="Sort tagged conversations">
+            <option value="newest">Newest updated</option>
+            <option value="oldest">Oldest updated</option>
+            <option value="tag">Tag A-Z</option>
+            <option value="username">Username A-Z</option>
+          </select>
+          <label for="viewSelect">View</label>
+          <select id="viewSelect" aria-label="View tagged conversations">
+            <option value="active">Active</option>
+            <option value="all">All</option>
+            <option value="pinned">Pinned</option>
+            <option value="withNotes">With notes</option>
+            <option value="withoutNotes">No notes</option>
+            <option value="archived">Archived</option>
+          </select>
         </div>
         <div class="filter-row">
           <input id="filterInput" type="search" placeholder="Filter by tag, username, or note..." aria-label="Filter tagged conversations" />
           <button id="clearFilterBtn" class="icon-btn" type="button" aria-label="Clear filter">x</button>
+        </div>
+        <div id="tagCloud" class="tag-cloud" aria-label="Saved tag filters"></div>
+        <div id="bulkToolbar" class="bulk-toolbar" hidden>
+          <span id="selectedCount" class="subtle-text">0 selected</span>
+          <button id="selectVisibleBtn" class="ghost-btn" type="button">Select Visible</button>
+          <button id="exportSelectedBtn" class="ghost-btn" type="button">Export Selected</button>
+          <button id="archiveSelectedBtn" class="ghost-btn" type="button">Archive Selected</button>
+          <button id="deleteSelectedBtn" class="ghost-btn danger-action" type="button">Delete Selected</button>
+          <button id="clearSelectionBtn" class="ghost-btn" type="button">Clear</button>
         </div>
         <ul id="taggedList" class="tagged-list"></ul>
       </section>

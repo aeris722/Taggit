@@ -64,7 +64,6 @@ const JUNK_TEXT_PATTERNS = [
   /^page not found$/i,
   /^\d{1,2}:\d{2}\s*(am|pm)?$/i,
 ];
-
 const MESSAGE_MIN_LENGTH = 2;
 const MESSAGE_MAX_LENGTH = 1200;
 const SUMMARY_MESSAGE_LIMIT = 80;
@@ -480,9 +479,11 @@ class RedditChatTagInjector {
   updateButton(button, root) {
     const context = this.getContext(root);
     const existing = this.tagMap.get(context.conversationId);
+    const color = existing?.color || DEFAULT_TAG_COLOR;
 
     button.textContent = existing?.tag || "Tag";
-    button.style.background = existing?.color || DEFAULT_TAG_COLOR;
+    button.style.background = `linear-gradient(135deg, ${color}, ${color})`;
+    button.style.boxShadow = `0 8px 20px ${color}33, 0 2px 8px rgba(0,0,0,0.18)`;
     button.title = existing ? `Tagged: ${existing.tag}` : "Tag this Reddit chat";
     button.setAttribute(
       "aria-label",
@@ -513,10 +514,10 @@ class RedditChatTagInjector {
         right: "10px",
         top: "50%",
         transform: "translateY(-50%)",
-        color: "#111",
-        border: "none",
+        color: "#0b1018",
+        border: "1px solid rgba(255,255,255,0.42)",
         borderRadius: "9999px",
-        padding: "2px 8px",
+        padding: "3px 9px",
         maxWidth: "68px",
         fontSize: "11px",
         fontWeight: "700",
@@ -525,7 +526,10 @@ class RedditChatTagInjector {
         textOverflow: "ellipsis",
         whiteSpace: "nowrap",
         cursor: "pointer",
-        opacity: "0.92",
+        opacity: "0.94",
+        backdropFilter: "blur(10px)",
+        WebkitBackdropFilter: "blur(10px)",
+        transition: "opacity 120ms ease, transform 120ms ease, box-shadow 120ms ease",
         zIndex: "20",
       });
 
@@ -535,7 +539,7 @@ class RedditChatTagInjector {
       });
 
       button.addEventListener("mouseleave", () => {
-        button.style.opacity = "0.92";
+        button.style.opacity = "0.94";
         button.style.transform = "translateY(-50%)";
       });
 
