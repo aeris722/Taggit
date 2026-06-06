@@ -1,57 +1,113 @@
 importScripts("../utils/constants.js", "../utils/storage.js");
 
 const { MESSAGE_TYPES } = globalThis.TaggitConstants;
-const { getBestChatHref, getConversationId, getSafeChatHref, saveContext } = globalThis.TaggitStorage;
+
+const {
+  getBestChatHref,
+  getConversationId,
+  getSafeChatHref,
+  saveContext,
+} = globalThis.TaggitStorage;
 
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((error) => {
-    console.warn("[Taggit] Unable to set side panel behavior.", error);
-  });
+  if (!chrome.sidePanel) {
+    console.warn("[Taggit] Side Panel API is not available.");
+    return;
+  }
+
+  chrome.sidePanel
+    .setPanelBehavior({
+      openPanelOnActionClick: true,
+    })
+    .catch((error) => {
+      console.warn(
+        "[Taggit] Unable to set side panel behavior.",
+        error
+      );
+    });
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  const isOpenSidebarMessage =
-    message?.type === MESSAGE_TYPES.openSidebar;
+  switch (message?.type) {
+    case MESSAGE_TYPES.openChat: {
+      const fallbackUrl = "https://www.reddit.com/chat/";
+      const url =
+        getSafeChatHref?.(message) ||
+        getBestChatHref(message) ||
+        fallbackUrl;
 
-  if (message?.type === MESSAGE_TYPES.openChat) {
-    const fallbackUrl = "https://www.reddit.com/chat/";
-    const url = getBestChatHref(message) || fallbackUrl;
+      chrome.tabs
+        .create({ url })
+        .then(() => {
+          sendResponse({ ok: true });
+        })
+        .catch((error) => {
+          console.warn("[Taggit] Unable to open chat.", error);
 
-    chrome.tabs
-      .create({ url })
-      .then(() => sendResponse({ ok: true }))
-      .catch((error) => {
-        console.warn("[Taggit] Unable to open chat.", error);
-        sendResponse({ ok: false });
-      });
+          sendResponse({
+            ok: false,
+            error: error?.message,
+          });
+        });
 
-    return true;
+      return true;
+    }
+
+    case MESSAGE_TYPES.openSidebar: {
+      if (!chrome.sidePanel) {
+        sendResponse({
+          ok: false,
+          error: "Side Panel API not supported.",
+        });
+        return false;
+      }
+
+      const tabId = sender?.tab?.id;
+
+      if (typeof tabId !== "number") {
+        sendResponse({
+          ok: false,
+          error: "Missing tab id.",
+        });
+        return false;
+      }
+
+      const href =
+        getSafeChatHref?.(message) ||
+        getBestChatHref(message);
+
+      const context = {
+        username: message.username || "Unknown",
+        href,
+        conversationId:
+          message.conversationId ||
+          getConversationId(message),
+        updatedAt: Date.now(),
+      };
+
+      Promise.all([
+        chrome.sidePanel.open({ tabId }),
+        saveContext(context),
+      ])
+        .then(() => {
+          sendResponse({ ok: true });
+        })
+        .catch((error) => {
+          console.warn(
+            "[Taggit] Unable to open side panel.",
+            error
+          );
+
+          sendResponse({
+            ok: false,
+            error: error?.message,
+          });
+        });
+
+      return true;
+    }
+
+    default:
+      return false;
   }
-
-  if (!isOpenSidebarMessage) return false;
-
-  const tabId = sender.tab?.id;
-  if (!tabId) {
-    sendResponse({ ok: false });
-    return false;
-  }
-
-  const context = {
-    username: message.username || "Unknown",
-    href: getBestChatHref(message),
-    conversationId: message.conversationId || getConversationId(message),
-    updatedAt: Date.now(),
-  };
-
-  Promise.all([
-    chrome.sidePanel.open({ tabId }),
-    saveContext(context),
-  ])
-    .then(() => sendResponse({ ok: true }))
-    .catch((error) => {
-      console.warn("[Taggit] Unable to open side panel.", error);
-      sendResponse({ ok: false });
-    });
-
-  return true;
 });
