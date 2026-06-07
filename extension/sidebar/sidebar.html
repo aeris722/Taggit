@@ -12,7 +12,7 @@
         <div class="brand-mark" aria-hidden="true">T</div>
         <div class="header-text">
           <h1>Taggit</h1>
-          <p>Tag and organize your Reddit conversations.</p>
+          <p>Remember people and know who to follow up with.</p>
         </div>
         <div class="header-actions">
           <button id="densityToggleBtn" class="icon-btn density-toggle" type="button" aria-label="Toggle compact density" aria-pressed="false" title="Toggle density">N</button>
@@ -20,22 +20,22 @@
         </div>
       </header>
 
-      <section class="stats-strip" aria-label="Tag stats">
+      <section class="stats-strip" aria-label="Follow-up inbox stats">
         <div class="stat">
           <span id="totalStat" class="stat-value">0</span>
-          <span class="stat-label">Saved</span>
+          <span class="stat-label">Due Today</span>
         </div>
         <div class="stat">
           <span id="pinnedStat" class="stat-value">0</span>
-          <span class="stat-label">Pinned</span>
+          <span class="stat-label">Overdue</span>
         </div>
         <div class="stat">
           <span id="notesStat" class="stat-value">0</span>
-          <span class="stat-label">Notes</span>
+          <span class="stat-label">Upcoming</span>
         </div>
         <div class="stat">
           <span id="uniqueStat" class="stat-value">0</span>
-          <span class="stat-label">Tags</span>
+          <span class="stat-label">Waiting</span>
         </div>
       </section>
 
@@ -60,6 +60,41 @@
           </div>
           <div id="tagSuggestions" class="suggestion-row" aria-label="Quick tag suggestions"></div>
 
+          <div class="workflow-grid">
+            <div>
+              <label for="statusSelect">Status</label>
+              <select id="statusSelect">
+                <option value="active">Active</option>
+                <option value="waiting">Waiting</option>
+                <option value="opportunity">Opportunity</option>
+                <option value="done">Done</option>
+              </select>
+            </div>
+            <div>
+              <label for="prioritySelect">Priority</label>
+              <select id="prioritySelect">
+                <option value="normal">Normal</option>
+                <option value="high">High</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="workflow-grid">
+            <div>
+              <label for="followUpDateInput">Follow-up Date</label>
+              <input id="followUpDateInput" type="date" />
+            </div>
+            <div>
+              <label for="relationshipTypeInput">Relationship Type</label>
+              <input id="relationshipTypeInput" type="text" placeholder="e.g. founder, client" maxlength="80" />
+            </div>
+          </div>
+
+          <label for="nextStepInput">Next Step</label>
+          <input id="nextStepInput" type="text" placeholder="What should you do next?" maxlength="280" />
+
+
           <div class="label-row">
             <label for="descInput">Description</label>
             <span id="descCharCount" class="counter">0/1600</span>
@@ -80,7 +115,7 @@
 
       <section class="card">
         <div class="section-heading">
-          <span class="card-title">AI Summary</span>
+          <span class="card-title">AI Relationship Brief</span>
           <span id="summaryStatus" class="subtle-text" role="status" aria-live="polite"></span>
         </div>
         <label for="apiKeyInput">Gemini API Key</label>
@@ -90,7 +125,7 @@
           <button id="summarizeBtn" type="button">Summarize</button>
         </div>
         <div class="summary-feedback">
-          <button id="useSummaryBtn" class="ghost-btn" type="button" disabled>Use as Note</button>
+          <button id="useSummaryBtn" class="ghost-btn" type="button" disabled>Apply AI</button>
           <button id="copySummaryBtn" class="ghost-btn" type="button" disabled>Copy</button>
           <button id="goodSummaryBtn" class="ghost-btn" type="button" disabled>Good</button>
           <button id="badSummaryBtn" class="ghost-btn" type="button" disabled>Bad</button>
@@ -101,7 +136,7 @@
       <section class="card">
         <div class="list-header">
           <div>
-            <span class="card-title">Tagged Conversations</span>
+            <span class="card-title">Follow-up Inbox</span>
             <span id="listCount" class="subtle-text"></span>
           </div>
           <div class="list-actions">
@@ -125,6 +160,12 @@
           <select id="viewSelect" aria-label="View tagged conversations">
             <option value="active">Active</option>
             <option value="all">All</option>
+            <option value="today">Today</option>
+            <option value="overdue">Overdue</option>
+            <option value="upcoming">Upcoming</option>
+            <option value="waiting">Waiting</option>
+            <option value="opportunities">Opportunities</option>
+            <option value="noNextStep">No next step</option>
             <option value="pinned">Pinned</option>
             <option value="withNotes">With notes</option>
             <option value="withoutNotes">No notes</option>
@@ -132,7 +173,7 @@
           </select>
         </div>
         <div class="filter-row">
-          <input id="filterInput" type="search" placeholder="Filter by tag, username, or note..." aria-label="Filter tagged conversations" />
+          <input id="filterInput" type="search" placeholder="Filter by tag, username, note, or next step..." aria-label="Filter tagged conversations" />
           <button id="clearFilterBtn" class="icon-btn" type="button" aria-label="Clear filter">x</button>
         </div>
         <div id="tagCloud" class="tag-cloud" aria-label="Saved tag filters"></div>

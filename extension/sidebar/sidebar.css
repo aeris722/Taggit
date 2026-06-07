@@ -941,3 +941,73 @@ button:disabled:hover {
     transition-duration: 0.01ms !important;
   }
 }
+.workflow-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.workflow-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.workflow-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.workflow-badge {
+  max-width: 100%;
+  padding: 2px 7px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.workflow-badge.status-waiting,
+.workflow-badge.due-today {
+  border-color: rgba(76, 201, 240, 0.38);
+  color: var(--accent2);
+}
+
+.workflow-badge.status-opportunity,
+.workflow-badge.priority-high {
+  border-color: rgba(255, 106, 61, 0.42);
+  color: var(--accent);
+}
+
+.workflow-badge.status-done {
+  border-color: rgba(53, 211, 153, 0.38);
+  color: var(--success);
+}
+
+.workflow-badge.due-overdue {
+  border-color: rgba(255, 92, 122, 0.45);
+  color: var(--danger);
+}
+
+.next-step {
+  padding: 7px 9px;
+  background: linear-gradient(90deg, rgba(76, 201, 240, 0.08), transparent), var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 340px) {
+  .workflow-grid {
+    grid-template-columns: 1fr;
+  }
+}
