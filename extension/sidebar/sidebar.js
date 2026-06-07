@@ -31,6 +31,7 @@ const els = {
   exportTagsBtn: document.getElementById("exportTagsBtn"),
   exportSelectedBtn: document.getElementById("exportSelectedBtn"),
   filterInput: document.getElementById("filterInput"),
+  followUpInput: document.getElementById("followUpInput"),
   formMode: document.getElementById("formMode"),
   importFileInput: document.getElementById("importFileInput"),
   importTagsBtn: document.getElementById("importTagsBtn"),
@@ -51,6 +52,7 @@ const els = {
   summaryOutput: document.getElementById("summaryOutput"),
   summaryStatus: document.getElementById("summaryStatus"),
   sortSelect: document.getElementById("sortSelect"),
+  statusSelect: document.getElementById("statusSelect"),
   tagCloud: document.getElementById("tagCloud"),
   themeToggleBtn: document.getElementById("themeToggleBtn"),
   totalStat: document.getElementById("totalStat"),
@@ -70,7 +72,24 @@ const DEFAULT_UI_PREFS = {
   viewMode: "active",
 };
 const SORT_MODES = new Set(["newest", "oldest", "tag", "username"]);
-const VIEW_MODES = new Set(["active", "all", "pinned", "withNotes", "withoutNotes", "archived"]);
+const VIEW_MODES = new Set([
+  "active",
+  "all",
+  "pinned",
+  "dueToday",
+  "overdue",
+  "opportunities",
+  "withNotes",
+  "withoutNotes",
+  "archived",
+]);
+const STATUS_LABELS = {
+  new: "New",
+  "follow-up": "Follow up",
+  waiting: "Waiting",
+  opportunity: "Opportunity",
+  closed: "Closed",
+};
 const STATUS_TIMEOUT_MS = 2200;
 const DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
   day: "numeric",
@@ -222,6 +241,37 @@ function formatDate(ts) {
   return Number.isNaN(date.getTime()) ? "" : DATE_FORMATTER.format(date);
 }
 
+function getTodayDateString() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getStatusLabel(status) {
+  return STATUS_LABELS[status] || STATUS_LABELS.new;
+}
+
+function hasFollowUp(item) {
+  return Boolean(item?.followUpAt);
+}
+
+function isDueToday(item) {
+  return hasFollowUp(item) && item.followUpAt === getTodayDateString();
+}
+
+function isOverdue(item) {
+  return hasFollowUp(item) && item.followUpAt < getTodayDateString();
+}
+
+function formatFollowUpDate(value) {
+  if (!value) return "";
+
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? value : DATE_FORMATTER.format(date);
+}
+
 function appendText(parent, text) {
   parent.appendChild(document.createTextNode(text));
 }
@@ -356,7 +406,7 @@ function createTaggedItem(item) {
   listItem.classList.toggle("is-archived", isArchived(item));
   listItem.classList.toggle("is-pinned", isPinned(item));
   listItem.classList.toggle("is-selected", selectedIds.has(itemKey));
-  listItem.dataset.id = item.id;
+  listItem.dataset.id = itemKey;
 
   const top = document.createElement("div");
   top.className = "tagged-top";
@@ -391,6 +441,27 @@ function createTaggedItem(item) {
   username.textContent = `@${item.username || "Unknown"}`;
 
   listItem.append(top, username);
+
+  const detailRow = document.createElement("div");
+  detailRow.className = "item-detail-row";
+
+  const statusBadge = document.createElement("span");
+  statusBadge.className = "meta-chip";
+  statusBadge.textContent = getStatusLabel(item.status);
+  detailRow.appendChild(statusBadge);
+
+  if (hasFollowUp(item)) {
+    const followUpBadge = document.createElement("span");
+    followUpBadge.className = "meta-chip follow-up-chip";
+    followUpBadge.classList.toggle("is-due", isDueToday(item));
+    followUpBadge.classList.toggle("is-overdue", isOverdue(item));
+    followUpBadge.textContent = isOverdue(item)
+      ? `Overdue ${formatFollowUpDate(item.followUpAt)}`
+      : `Follow up ${formatFollowUpDate(item.followUpAt)}`;
+    detailRow.appendChild(followUpBadge);
+  }
+
+  listItem.appendChild(detailRow);
 
   if (item.description) {
     const desc = document.createElement("p");
@@ -437,7 +508,7 @@ function createTaggedItem(item) {
   deleteButton.className = "delete-btn";
   deleteButton.type = "button";
   deleteButton.dataset.action = "delete";
-  deleteButton.dataset.id = item.id;
+  deleteButton.dataset.id = itemKey;
   deleteButton.textContent = "Delete";
 
   actions.append(editButton, copyButton, pinButton, archiveButton, deleteButton);
@@ -471,11 +542,14 @@ function getFilteredConversations() {
       if (!["all", "archived"].includes(activeViewMode) && archived) return false;
       if (activeViewMode === "archived" && !archived) return false;
       if (activeViewMode === "pinned" && !isPinned(item)) return false;
+      if (activeViewMode === "dueToday" && !isDueToday(item)) return false;
+      if (activeViewMode === "overdue" && !isOverdue(item)) return false;
+      if (activeViewMode === "opportunities" && item.status !== "opportunity") return false;
       if (activeViewMode === "withNotes" && !item.description?.trim()) return false;
       if (activeViewMode === "withoutNotes" && item.description?.trim()) return false;
       if (tagFilter && (item.tag || "").toLowerCase() !== tagFilter) return false;
       if (!query) return true;
-      return [item.tag, item.username, item.description].some((value) =>
+      return [item.tag, item.username, item.description, getStatusLabel(item.status), item.followUpAt].some((value) =>
         (value || "").toLowerCase().includes(query)
       );
     });
@@ -550,6 +624,8 @@ function syncFormWithCurrentContext() {
   if (!currentContext) {
     els.formMode.textContent = "Select a chat";
     els.saveBtn.textContent = "Save";
+    els.statusSelect.value = "new";
+    els.followUpInput.value = "";
     return;
   }
 
@@ -560,6 +636,8 @@ function syncFormWithCurrentContext() {
   if (!existing) {
     els.tagInput.value = "";
     els.descInput.value = "";
+    els.statusSelect.value = "new";
+    els.followUpInput.value = "";
     autoResizeTextarea(els.descInput);
     selectedColor = DEFAULT_TAG_COLOR;
     updateSelectedColor();
@@ -569,6 +647,8 @@ function syncFormWithCurrentContext() {
 
   els.tagInput.value = existing.tag || "";
   els.descInput.value = existing.description || "";
+  els.statusSelect.value = existing.status || "new";
+  els.followUpInput.value = existing.followUpAt || "";
   autoResizeTextarea(els.descInput);
   selectedColor = existing.color || DEFAULT_TAG_COLOR;
   updateSelectedColor();
@@ -579,6 +659,8 @@ function resetForm() {
   const existing = getExistingTagForContext();
   els.tagInput.value = existing?.tag || "";
   els.descInput.value = existing?.description || "";
+  els.statusSelect.value = existing?.status || "new";
+  els.followUpInput.value = existing?.followUpAt || "";
   autoResizeTextarea(els.descInput);
   selectedColor = existing?.color || DEFAULT_TAG_COLOR;
   updateSelectedColor();
@@ -823,10 +905,12 @@ function exportCsv(tags = getFilteredConversations()) {
   if (!exportedTags.length) return;
 
   const rows = [
-    ["tag", "username", "description", "href", "createdAt", "updatedAt", "pinned", "archived"],
+    ["tag", "username", "status", "followUpAt", "description", "href", "createdAt", "updatedAt", "pinned", "archived"],
     ...exportedTags.map((item) => [
       item.tag,
       item.username,
+      getStatusLabel(item.status),
+      item.followUpAt,
       item.description,
       getBestChatHref(item),
       item.createdAt ? new Date(item.createdAt).toISOString() : "",
@@ -855,6 +939,8 @@ function formatMarkdown(tags = getFilteredConversations()) {
   return exportedTags.map((item) => {
     const lines = [
       `- ${item.tag} - @${item.username || "Unknown"}`,
+      `  - Status: ${getStatusLabel(item.status)}`,
+      item.followUpAt ? `  - Follow-up: ${item.followUpAt}` : "",
       item.description ? `  - Note: ${item.description}` : "",
       getBestChatHref(item) ? `  - Chat: ${getBestChatHref(item)}` : "",
       isPinned(item) ? "  - Pinned: yes" : "",
@@ -1099,26 +1185,35 @@ async function onSubmit(event) {
   }
 
   const existing = getExistingTagForContext();
-  setSaving(true);
-  taggedConversations = upsertTag(taggedConversations, {
+  const previousTags = taggedConversations;
+  const nextTag = {
     conversationId,
     tag,
     color: selectedColor,
     username: currentContext.username || "Unknown",
     href: currentContext.href || "",
     description: els.descInput?.value.trim().slice(0, LIMITS.noteMaxLength) || "",
+    status: els.statusSelect.value || "new",
+    followUpAt: els.followUpInput.value || "",
     createdAt: Date.now(),
     updatedAt: Date.now(),
-  });
+  };
+
+  setSaving(true);
+  taggedConversations = upsertTag([...taggedConversations], nextTag);
 
   try {
     await save();
     if (latestConversation && els.descInput?.value.trim()) {
-      await saveAiExample(els.descInput.value.trim(), "good");
+      saveAiExample(els.descInput.value.trim(), "good").catch((error) => {
+        console.warn("[Taggit] Failed to save AI example.", error);
+      });
     }
     setStatus(existing ? "Tag updated." : "Tag saved.", "success");
     renderList();
   } catch (error) {
+    taggedConversations = previousTags;
+    renderList();
     console.warn("[Taggit] Failed to save tag.", error);
     setStatus("Could not save. Try again.", "error");
   } finally {
@@ -1168,8 +1263,10 @@ async function onClickList(event) {
 
   const previousTags = taggedConversations;
   const previousPrefs = uiPrefs;
+  const previousSelectedIds = new Set(selectedIds);
   const deleteId = actionTarget.dataset.id;
-  taggedConversations = taggedConversations.filter((tag) => tag.id !== actionTarget.dataset.id);
+  taggedConversations = taggedConversations.filter((tag) => getItemKey(tag) !== deleteId);
+  selectedIds.delete(deleteId);
   uiPrefs = {
     ...uiPrefs,
     archivedIds: (uiPrefs.archivedIds || []).filter((id) => id !== deleteId),
@@ -1185,6 +1282,7 @@ async function onClickList(event) {
   } catch (error) {
     taggedConversations = previousTags;
     uiPrefs = previousPrefs;
+    selectedIds = previousSelectedIds;
     renderList();
     console.warn("[Taggit] Failed to delete tag.", error);
     setStatus("Could not delete. Try again.", "error");

@@ -6,6 +6,11 @@
     return String(value || "").trim().slice(0, maxLength);
   }
 
+  function cleanDate(value) {
+    const date = String(value || "").trim();
+    return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : "";
+  }
+
   function normalizeUrl(value) {
     if (!value) return "";
 
@@ -46,6 +51,11 @@
     return username ? `username:${username}` : "";
   }
 
+  function normalizeStatus(value) {
+    const status = cleanString(value, 32);
+    return ["new", "follow-up", "waiting", "opportunity", "closed"].includes(status) ? status : "new";
+  }
+
   function normalizeTag(item = {}) {
     if (!item || typeof item !== "object") return null;
 
@@ -61,6 +71,8 @@
       username: cleanString(item.username, 80) || "Unknown",
       href: getSafeChatHref(cleanString(item.href, 500)),
       description: cleanString(item.description, LIMITS.noteMaxLength),
+      status: normalizeStatus(item.status),
+      followUpAt: cleanDate(item.followUpAt),
       createdAt: Number(item.createdAt) || Date.now(),
       updatedAt: Number(item.updatedAt) || Number(item.createdAt) || Date.now(),
     };

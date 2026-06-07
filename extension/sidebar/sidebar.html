@@ -60,6 +60,23 @@
           </div>
           <div id="tagSuggestions" class="suggestion-row" aria-label="Quick tag suggestions"></div>
 
+          <div class="form-grid">
+            <div>
+              <label for="statusSelect">Status</label>
+              <select id="statusSelect" aria-label="Conversation relationship status">
+                <option value="new">New</option>
+                <option value="follow-up">Follow up</option>
+                <option value="waiting">Waiting</option>
+                <option value="opportunity">Opportunity</option>
+                <option value="closed">Closed</option>
+              </select>
+            </div>
+            <div>
+              <label for="followUpInput">Follow-up</label>
+              <input id="followUpInput" type="date" aria-label="Follow-up date" />
+            </div>
+          </div>
+
           <div class="label-row">
             <label for="descInput">Description</label>
             <span id="descCharCount" class="counter">0/1600</span>
@@ -126,6 +143,9 @@
             <option value="active">Active</option>
             <option value="all">All</option>
             <option value="pinned">Pinned</option>
+            <option value="dueToday">Due today</option>
+            <option value="overdue">Overdue</option>
+            <option value="opportunities">Opportunities</option>
             <option value="withNotes">With notes</option>
             <option value="withoutNotes">No notes</option>
             <option value="archived">Archived</option>
