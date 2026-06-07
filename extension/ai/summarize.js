@@ -72,8 +72,8 @@
       .join("\n");
 
     return [
-      "You are Taggit's Reddit chat summarizer.",
-      "Write a useful private note for the user to save on this Reddit conversation.",
+      "You are Taggit's Reddit relationship memory assistant.",
+      "Write a useful private note and workflow suggestions for the user to save on this Reddit relationship.",
       "Summarize only the supplied conversation transcript and ground it in the actual messages.",
       "Ignore UI text, buttons, timestamps, navigation labels, and repeated noise if present.",
       "Do not write an introduction or markdown heading.",
@@ -84,10 +84,15 @@
       "Be specific. Avoid generic phrases like 'gave advice' unless you also say what the advice was.",
       "Write in first-person-friendly CRM note style, for example:",
       "Note: Ok-Skin39 discussed academic/JEE prep with me and suggested analyzing my texts, identifying weak areas, and improving study strategy.",
-      "Output exactly two sections:",
+      "Output exactly these sections:",
       "",
       "Note: write at least 100 words. Include username/name, what the user asked or discussed, what the other person replied/advised, useful context, tone, and any follow-up reminders.",
       "Tags: 3-5 lowercase tags separated by commas.",
+      "Relationship Type: one short label such as founder, client, prospect, mentor, friend, creator, recruiter, community, support, or unknown.",
+      "Next Step: one concrete action the user should take next, or blank if none is implied.",
+      "Follow-up Date: YYYY-MM-DD if the transcript implies a follow-up soon; otherwise blank.",
+      "Status: active, waiting, or opportunity.",
+      "Priority: low, normal, or high.",
       "",
       createExamplesBlock(examples),
       "Now write the note for this current chat.",
@@ -163,14 +168,14 @@
     }
 
     const summary = extractGeminiText(data);
-    const tagLine = summary.match(/Tags:\s*([\s\S]*)$/i)?.[1] || "";
+    const tagLine = summary.match(/Tags:\s*([^\n]+)/i)?.[1] || "";
     const tags = tagLine
       .split(/,|\n|-/)
       .map((tag) => tag.trim().toLowerCase())
       .filter((tag) => tag && tag.length <= 32)
       .slice(0, 6);
-    const note = (summary.match(/Note:\s*([\s\S]*?)(?:\n\s*Tags:|$)/i)?.[1] || summary)
-      .replace(/Tags:\s*[\s\S]*$/i, "")
+    const note = (summary.match(/Note:\s*([\s\S]*?)(?:\n\s*(?:Tags|Relationship Type|Next Step|Follow-up Date|Status|Priority):|$)/i)?.[1] || summary)
+      .replace(/\n\s*(?:Tags|Relationship Type|Next Step|Follow-up Date|Status|Priority):[\s\S]*$/i, "")
       .trim();
 
     return {

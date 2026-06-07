@@ -15,6 +15,11 @@ const els = {
   tagInput: document.getElementById("tagInput"),
   tagCharCount: document.getElementById("tagCharCount"),
   tagSuggestions: document.getElementById("tagSuggestions"),
+  statusSelect: document.getElementById("statusSelect"),
+  followUpDateInput: document.getElementById("followUpDateInput"),
+  nextStepInput: document.getElementById("nextStepInput"),
+  prioritySelect: document.getElementById("prioritySelect"),
+  relationshipTypeInput: document.getElementById("relationshipTypeInput"),
   list: document.getElementById("taggedList"),
   clearAllBtn: document.getElementById("clearAllBtn"),
   clearFilterBtn: document.getElementById("clearFilterBtn"),
@@ -70,7 +75,7 @@ const DEFAULT_UI_PREFS = {
   viewMode: "active",
 };
 const SORT_MODES = new Set(["newest", "oldest", "tag", "username"]);
-const VIEW_MODES = new Set(["active", "all", "pinned", "withNotes", "withoutNotes", "archived"]);
+const VIEW_MODES = new Set(["active", "all", "today", "overdue", "upcoming", "waiting", "opportunities", "noNextStep", "pinned", "withNotes", "withoutNotes", "archived"]);
 const STATUS_TIMEOUT_MS = 2200;
 const DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
   day: "numeric",
@@ -94,6 +99,74 @@ let uiPrefs = { ...DEFAULT_UI_PREFS };
 let latestSummaryNote = "";
 let latestConversation = null;
 let latestSummary = null;
+let latestAiSuggestions = {};
+
+
+function toDateInputValue(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function addDays(days) {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() + days);
+  return toDateInputValue(date);
+}
+
+function normalizeDateInput(value) {
+  const cleanValue = String(value || "").trim();
+  const match = cleanValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return "";
+  const [, year, month, day] = match;
+  const date = new Date(`${year}-${month}-${day}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return "";
+  if (date.getUTCFullYear() !== Number(year) || date.getUTCMonth() + 1 !== Number(month) || date.getUTCDate() !== Number(day)) return "";
+  return cleanValue;
+}
+
+function getFollowUpBucket(item = {}) {
+  const date = normalizeDateInput(item.followUpDate);
+  if (!date || item.status === "done") return "none";
+  const today = toDateInputValue();
+  if (date < today) return "overdue";
+  if (date === today) return "today";
+  return "upcoming";
+}
+
+function getWorkflowCounts(items = taggedConversations) {
+  return items.reduce((counts, item) => {
+    const bucket = getFollowUpBucket(item);
+    if (bucket === "today") counts.today += 1;
+    if (bucket === "overdue") counts.overdue += 1;
+    if (bucket === "upcoming") counts.upcoming += 1;
+    if (item.status === "waiting") counts.waiting += 1;
+    if (item.status === "opportunity") counts.opportunities += 1;
+    if (!String(item.nextStep || "").trim() && item.status !== "done") counts.noNextStep += 1;
+    return counts;
+  }, { today: 0, overdue: 0, upcoming: 0, waiting: 0, opportunities: 0, noNextStep: 0 });
+}
+
+function getStatusLabel(status = "active") {
+  return { active: "Active", waiting: "Waiting", opportunity: "Opportunity", done: "Done" }[status] || "Active";
+}
+
+function getPriorityLabel(priority = "normal") {
+  return { low: "Low", normal: "Normal", high: "High" }[priority] || "Normal";
+}
+
+function normalizeStatusValue(value) {
+  const status = String(value || "active").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (status === "follow_up" || status === "followup") return "active";
+  return ["active", "waiting", "opportunity", "done"].includes(status) ? status : "active";
+}
+
+function normalizePriorityValue(value) {
+  const priority = String(value || "normal").trim().toLowerCase();
+  return ["low", "normal", "high"].includes(priority) ? priority : "normal";
+}
 
 function buildColorPicker() {
   els.colorPicker.replaceChildren();
@@ -392,6 +465,43 @@ function createTaggedItem(item) {
 
   listItem.append(top, username);
 
+  const workflowMeta = document.createElement("div");
+  workflowMeta.className = "workflow-meta";
+  const statusBadge = document.createElement("span");
+  statusBadge.className = `workflow-badge status-${item.status || "active"}`;
+  statusBadge.textContent = getStatusLabel(item.status);
+  workflowMeta.appendChild(statusBadge);
+
+  if (item.priority && item.priority !== "normal") {
+    const priorityBadge = document.createElement("span");
+    priorityBadge.className = `workflow-badge priority-${item.priority}`;
+    priorityBadge.textContent = `${getPriorityLabel(item.priority)} priority`;
+    workflowMeta.appendChild(priorityBadge);
+  }
+
+  if (item.followUpDate) {
+    const followUp = document.createElement("span");
+    followUp.className = `workflow-badge due-${getFollowUpBucket(item)}`;
+    followUp.textContent = `Follow up ${item.followUpDate}`;
+    workflowMeta.appendChild(followUp);
+  }
+
+  if (item.relationshipType) {
+    const type = document.createElement("span");
+    type.className = "workflow-badge";
+    type.textContent = item.relationshipType;
+    workflowMeta.appendChild(type);
+  }
+
+  if (workflowMeta.children.length) listItem.appendChild(workflowMeta);
+
+  if (item.nextStep) {
+    const nextStep = document.createElement("p");
+    nextStep.className = "next-step";
+    nextStep.textContent = `Next: ${item.nextStep}`;
+    listItem.appendChild(nextStep);
+  }
+
   if (item.description) {
     const desc = document.createElement("p");
     desc.className = "desc";
@@ -426,6 +536,48 @@ function createTaggedItem(item) {
   copyButton.dataset.id = itemKey;
   copyButton.textContent = "Copy";
 
+  const followUpButton = document.createElement("button");
+  followUpButton.className = "pin-btn";
+  followUpButton.type = "button";
+  followUpButton.dataset.action = "set-follow-up";
+  followUpButton.dataset.id = itemKey;
+  followUpButton.textContent = "Set Follow-up";
+
+  const doneButton = document.createElement("button");
+  doneButton.className = "pin-btn";
+  doneButton.type = "button";
+  doneButton.dataset.action = "mark-done";
+  doneButton.dataset.id = itemKey;
+  doneButton.textContent = "Done";
+
+  const waitingButton = document.createElement("button");
+  waitingButton.className = "pin-btn";
+  waitingButton.type = "button";
+  waitingButton.dataset.action = "mark-waiting";
+  waitingButton.dataset.id = itemKey;
+  waitingButton.textContent = "Waiting";
+
+  const opportunityButton = document.createElement("button");
+  opportunityButton.className = "pin-btn";
+  opportunityButton.type = "button";
+  opportunityButton.dataset.action = "mark-opportunity";
+  opportunityButton.dataset.id = itemKey;
+  opportunityButton.textContent = "Opportunity";
+
+  const nextStepButton = document.createElement("button");
+  nextStepButton.className = "pin-btn";
+  nextStepButton.type = "button";
+  nextStepButton.dataset.action = "add-next-step";
+  nextStepButton.dataset.id = itemKey;
+  nextStepButton.textContent = "Next Step";
+
+  const snoozeButton = document.createElement("button");
+  snoozeButton.className = "pin-btn";
+  snoozeButton.type = "button";
+  snoozeButton.dataset.action = "snooze";
+  snoozeButton.dataset.id = itemKey;
+  snoozeButton.textContent = "Snooze";
+
   const archiveButton = document.createElement("button");
   archiveButton.className = "archive-btn";
   archiveButton.type = "button";
@@ -437,10 +589,10 @@ function createTaggedItem(item) {
   deleteButton.className = "delete-btn";
   deleteButton.type = "button";
   deleteButton.dataset.action = "delete";
-  deleteButton.dataset.id = item.id;
+  deleteButton.dataset.id = itemKey;
   deleteButton.textContent = "Delete";
 
-  actions.append(editButton, copyButton, pinButton, archiveButton, deleteButton);
+  actions.append(followUpButton, doneButton, waitingButton, opportunityButton, nextStepButton, snoozeButton, editButton, copyButton, pinButton, archiveButton, deleteButton);
   listItem.appendChild(actions);
 
   return listItem;
@@ -470,27 +622,31 @@ function getFilteredConversations() {
       const archived = isArchived(item);
       if (!["all", "archived"].includes(activeViewMode) && archived) return false;
       if (activeViewMode === "archived" && !archived) return false;
+      const bucket = getFollowUpBucket(item);
+      if (activeViewMode === "today" && bucket !== "today") return false;
+      if (activeViewMode === "overdue" && bucket !== "overdue") return false;
+      if (activeViewMode === "upcoming" && bucket !== "upcoming") return false;
+      if (activeViewMode === "waiting" && item.status !== "waiting") return false;
+      if (activeViewMode === "opportunities" && item.status !== "opportunity") return false;
+      if (activeViewMode === "noNextStep" && (item.nextStep?.trim() || item.status === "done")) return false;
       if (activeViewMode === "pinned" && !isPinned(item)) return false;
       if (activeViewMode === "withNotes" && !item.description?.trim()) return false;
       if (activeViewMode === "withoutNotes" && item.description?.trim()) return false;
       if (tagFilter && (item.tag || "").toLowerCase() !== tagFilter) return false;
       if (!query) return true;
-      return [item.tag, item.username, item.description].some((value) =>
+      return [item.tag, item.username, item.description, item.nextStep, item.relationshipType, item.status].some((value) =>
         (value || "").toLowerCase().includes(query)
       );
     });
 }
 
 function renderStats() {
-  const total = taggedConversations.length;
-  const pinnedCount = taggedConversations.filter(isPinned).length;
-  const notes = taggedConversations.filter((item) => item.description?.trim()).length;
-  const unique = new Set(taggedConversations.map((item) => (item.tag || "").trim().toLowerCase()).filter(Boolean));
-
-  els.totalStat.textContent = String(total);
-  els.pinnedStat.textContent = String(pinnedCount);
-  els.notesStat.textContent = String(notes);
-  els.uniqueStat.textContent = String(unique.size);
+  const activeItems = taggedConversations.filter((item) => !isArchived(item));
+  const counts = getWorkflowCounts(activeItems);
+  els.totalStat.textContent = String(counts.today);
+  els.pinnedStat.textContent = String(counts.overdue);
+  els.notesStat.textContent = String(counts.upcoming);
+  els.uniqueStat.textContent = String(counts.waiting);
 }
 
 function pruneSelectedIds() {
@@ -527,12 +683,12 @@ function renderList() {
   renderBulkToolbar(filtered);
 
   if (!taggedConversations.length) {
-    renderEmpty("No tagged conversations yet.");
+    renderEmpty("No relationships saved yet. Open a Reddit chat, tag someone important, add a next step, and set your first follow-up.");
     return;
   }
 
   if (!filtered.length) {
-    renderEmpty("No tags match your filter.");
+    renderEmpty("No relationships match this view or filter.");
     return;
   }
 
@@ -560,6 +716,11 @@ function syncFormWithCurrentContext() {
   if (!existing) {
     els.tagInput.value = "";
     els.descInput.value = "";
+    els.statusSelect.value = "active";
+    els.followUpDateInput.value = "";
+    els.nextStepInput.value = "";
+    els.prioritySelect.value = "normal";
+    els.relationshipTypeInput.value = "";
     autoResizeTextarea(els.descInput);
     selectedColor = DEFAULT_TAG_COLOR;
     updateSelectedColor();
@@ -569,6 +730,11 @@ function syncFormWithCurrentContext() {
 
   els.tagInput.value = existing.tag || "";
   els.descInput.value = existing.description || "";
+  els.statusSelect.value = existing.status || "active";
+  els.followUpDateInput.value = existing.followUpDate || "";
+  els.nextStepInput.value = existing.nextStep || "";
+  els.prioritySelect.value = existing.priority || "normal";
+  els.relationshipTypeInput.value = existing.relationshipType || "";
   autoResizeTextarea(els.descInput);
   selectedColor = existing.color || DEFAULT_TAG_COLOR;
   updateSelectedColor();
@@ -579,6 +745,11 @@ function resetForm() {
   const existing = getExistingTagForContext();
   els.tagInput.value = existing?.tag || "";
   els.descInput.value = existing?.description || "";
+  els.statusSelect.value = existing?.status || "active";
+  els.followUpDateInput.value = existing?.followUpDate || "";
+  els.nextStepInput.value = existing?.nextStep || "";
+  els.prioritySelect.value = existing?.priority || "normal";
+  els.relationshipTypeInput.value = existing?.relationshipType || "";
   autoResizeTextarea(els.descInput);
   selectedColor = existing?.color || DEFAULT_TAG_COLOR;
   updateSelectedColor();
@@ -623,21 +794,44 @@ function setSummaryLoading(isLoading) {
   els.summarizeBtn.textContent = isLoading ? "Summarizing..." : "Summarize";
 }
 
+function parseAiSuggestions(text = "") {
+  const getField = (label) => text.match(new RegExp(`${label}:\\s*([^\\n]+)`, "i"))?.[1]?.trim() || "";
+  const followUpDate = normalizeDateInput(getField("Follow-up Date"));
+  return {
+    note: text.match(/Note:\s*([\s\S]*?)(?:\n\s*(?:Tags|Relationship Type|Next Step|Follow-up Date|Status|Priority):|$)/i)?.[1]?.trim() || text.trim(),
+    tags: getField("Tags"),
+    relationshipType: getField("Relationship Type").slice(0, 80),
+    nextStep: getField("Next Step").slice(0, 280),
+    followUpDate,
+    status: normalizeStatusValue(getField("Status")),
+    priority: normalizePriorityValue(getField("Priority")),
+  };
+}
+
 function renderSummary(text, messageCount) {
   const cleanText = String(text || "").trim();
-  const note = cleanText.match(/Note:\s*([\s\S]*?)(?:\n\s*Tags:|$)/i)?.[1]?.trim() || cleanText;
-  const tags = cleanText.match(/Tags:\s*([\s\S]*)$/i)?.[1]?.trim() || "";
-  const displayText = tags ? `${note}\n\nTags: ${tags}` : note;
+  const suggestions = parseAiSuggestions(cleanText);
+  const note = suggestions.note || cleanText;
+  const displayLines = [
+    note,
+    suggestions.tags ? `Tags: ${suggestions.tags}` : "",
+    suggestions.relationshipType ? `Relationship Type: ${suggestions.relationshipType}` : "",
+    suggestions.nextStep ? `Next Step: ${suggestions.nextStep}` : "",
+    suggestions.followUpDate ? `Follow-up Date: ${suggestions.followUpDate}` : "",
+    suggestions.status ? `Status: ${getStatusLabel(suggestions.status)}` : "",
+    suggestions.priority ? `Priority: ${getPriorityLabel(suggestions.priority)}` : "",
+  ].filter(Boolean).join("\n");
   const looksTooShort = note.length < 20;
 
   els.summaryOutput.textContent = looksTooShort
     ? [
-        displayText || "Gemini returned a very short summary.",
+        displayLines || "Gemini returned a very short summary.",
         "",
         `Captured ${messageCount} visible chat messages. Open the exact conversation before summarizing.`,
       ].join("\n")
-    : displayText;
+    : displayLines;
 
+  latestAiSuggestions = suggestions;
   latestSummaryNote = note.slice(0, LIMITS.noteMaxLength);
   setSummaryFeedbackEnabled(Boolean(latestSummaryNote));
 }
@@ -766,6 +960,7 @@ async function markSummaryGood() {
 function markSummaryBad() {
   latestSummaryNote = "";
   latestSummary = null;
+  latestAiSuggestions = {};
   setSummaryFeedbackEnabled(false);
   setSummaryStatus("Marked bad. Edit the note after using a better summary.");
 }
@@ -823,10 +1018,15 @@ function exportCsv(tags = getFilteredConversations()) {
   if (!exportedTags.length) return;
 
   const rows = [
-    ["tag", "username", "description", "href", "createdAt", "updatedAt", "pinned", "archived"],
+    ["tag", "username", "status", "followUpDate", "nextStep", "priority", "relationshipType", "description", "href", "createdAt", "updatedAt", "pinned", "archived"],
     ...exportedTags.map((item) => [
       item.tag,
       item.username,
+      item.status,
+      item.followUpDate,
+      item.nextStep,
+      item.priority,
+      item.relationshipType,
       item.description,
       getBestChatHref(item),
       item.createdAt ? new Date(item.createdAt).toISOString() : "",
@@ -855,6 +1055,11 @@ function formatMarkdown(tags = getFilteredConversations()) {
   return exportedTags.map((item) => {
     const lines = [
       `- ${item.tag} - @${item.username || "Unknown"}`,
+      item.status ? `  - Status: ${getStatusLabel(item.status)}` : "",
+      item.followUpDate ? `  - Follow-up: ${item.followUpDate}` : "",
+      item.nextStep ? `  - Next step: ${item.nextStep}` : "",
+      item.priority ? `  - Priority: ${getPriorityLabel(item.priority)}` : "",
+      item.relationshipType ? `  - Relationship: ${item.relationshipType}` : "",
       item.description ? `  - Note: ${item.description}` : "",
       getBestChatHref(item) ? `  - Chat: ${getBestChatHref(item)}` : "",
       isPinned(item) ? "  - Pinned: yes" : "",
@@ -917,6 +1122,52 @@ async function importTagsFromFile(file) {
     els.importFileInput.value = "";
   }
 }
+
+async function updateConversationWorkflow(id, updates, message = "Relationship updated.") {
+  const index = taggedConversations.findIndex((item) => getItemKey(item) === id);
+  if (index < 0) return;
+
+  const previousTags = taggedConversations;
+  taggedConversations = taggedConversations.map((item, itemIndex) =>
+    itemIndex === index
+      ? { ...item, ...updates, updatedAt: Date.now() }
+      : item
+  );
+
+  try {
+    await save();
+    renderList();
+    syncFormWithCurrentContext();
+    setStatus(message, "success");
+  } catch (error) {
+    taggedConversations = previousTags;
+    renderList();
+    console.warn("[Taggit] Failed to update relationship workflow.", error);
+    setStatus("Could not update relationship.", "error");
+  }
+}
+
+async function setFollowUp(id) {
+  const item = findConversationByKey(id);
+  if (!item) return;
+  const value = prompt("Follow-up date (YYYY-MM-DD)", item.followUpDate || toDateInputValue());
+  if (value === null) return;
+  const followUpDate = normalizeDateInput(value);
+  if (value.trim() && !followUpDate) {
+    setStatus("Use YYYY-MM-DD for follow-up date.", "error");
+    return;
+  }
+  await updateConversationWorkflow(id, { followUpDate, status: item.status === "done" ? "active" : item.status }, followUpDate ? "Follow-up set." : "Follow-up cleared.");
+}
+
+async function addNextStep(id) {
+  const item = findConversationByKey(id);
+  if (!item) return;
+  const value = prompt("Next step", item.nextStep || "");
+  if (value === null) return;
+  await updateConversationWorkflow(id, { nextStep: value.trim().slice(0, 280) }, "Next step updated.");
+}
+
 
 async function togglePinned(id) {
   if (!id) return;
@@ -1063,6 +1314,7 @@ async function saveSummary(conversation, summary) {
     messageCount: conversation.messages?.length || 0,
     summary: summary.summary,
     tags: summary.tags || [],
+    suggestions: latestAiSuggestions,
     updatedAt: Date.now(),
   };
   await chrome.storage.local.set({ [TAGGIT_KEYS.summaries]: summaries });
@@ -1107,6 +1359,12 @@ async function onSubmit(event) {
     username: currentContext.username || "Unknown",
     href: currentContext.href || "",
     description: els.descInput?.value.trim().slice(0, LIMITS.noteMaxLength) || "",
+    status: els.statusSelect.value,
+    followUpDate: normalizeDateInput(els.followUpDateInput.value),
+    nextStep: els.nextStepInput.value.trim().slice(0, 280),
+    priority: els.prioritySelect.value,
+    relationshipType: els.relationshipTypeInput.value.trim().slice(0, 80),
+    lastContactedAt: Date.now(),
     createdAt: Date.now(),
     updatedAt: Date.now(),
   });
@@ -1135,6 +1393,37 @@ async function onClickList(event) {
   if (actionTarget.dataset.action === "select") {
     if (!(actionTarget instanceof HTMLInputElement)) return;
     setItemSelected(actionTarget.dataset.id, actionTarget.checked);
+    return;
+  }
+
+
+  if (actionTarget.dataset.action === "set-follow-up") {
+    await setFollowUp(actionTarget.dataset.id);
+    return;
+  }
+
+  if (actionTarget.dataset.action === "mark-done") {
+    await updateConversationWorkflow(actionTarget.dataset.id, { status: "done", followUpDate: "", lastContactedAt: Date.now() }, "Marked done.");
+    return;
+  }
+
+  if (actionTarget.dataset.action === "mark-waiting") {
+    await updateConversationWorkflow(actionTarget.dataset.id, { status: "waiting", lastContactedAt: Date.now() }, "Marked waiting.");
+    return;
+  }
+
+  if (actionTarget.dataset.action === "mark-opportunity") {
+    await updateConversationWorkflow(actionTarget.dataset.id, { status: "opportunity", priority: "high" }, "Marked opportunity.");
+    return;
+  }
+
+  if (actionTarget.dataset.action === "add-next-step") {
+    await addNextStep(actionTarget.dataset.id);
+    return;
+  }
+
+  if (actionTarget.dataset.action === "snooze") {
+    await updateConversationWorkflow(actionTarget.dataset.id, { followUpDate: addDays(3), status: "active" }, "Snoozed for 3 days.");
     return;
   }
 
@@ -1169,7 +1458,7 @@ async function onClickList(event) {
   const previousTags = taggedConversations;
   const previousPrefs = uiPrefs;
   const deleteId = actionTarget.dataset.id;
-  taggedConversations = taggedConversations.filter((tag) => tag.id !== actionTarget.dataset.id);
+  taggedConversations = taggedConversations.filter((tag) => getItemKey(tag) !== deleteId);
   uiPrefs = {
     ...uiPrefs,
     archivedIds: (uiPrefs.archivedIds || []).filter((id) => id !== deleteId),
@@ -1267,10 +1556,18 @@ els.summarizeBtn.addEventListener("click", summarizeCurrentChat);
 els.useSummaryBtn.addEventListener("click", () => {
   if (!latestSummaryNote) return;
   els.descInput.value = latestSummaryNote;
+  if (latestAiSuggestions.tags && !els.tagInput.value.trim()) {
+    els.tagInput.value = latestAiSuggestions.tags.split(",")[0]?.trim().slice(0, LIMITS.tagMaxLength) || "";
+  }
+  if (latestAiSuggestions.relationshipType) els.relationshipTypeInput.value = latestAiSuggestions.relationshipType;
+  if (latestAiSuggestions.nextStep) els.nextStepInput.value = latestAiSuggestions.nextStep;
+  if (latestAiSuggestions.followUpDate) els.followUpDateInput.value = latestAiSuggestions.followUpDate;
+  if (latestAiSuggestions.status) els.statusSelect.value = latestAiSuggestions.status;
+  if (latestAiSuggestions.priority) els.prioritySelect.value = latestAiSuggestions.priority;
   autoResizeTextarea(els.descInput);
   updateCounters();
   els.descInput.focus();
-  setStatus("Summary added to description.", "success");
+  setStatus("AI suggestions applied.", "success");
 });
 els.copySummaryBtn.addEventListener("click", copySummary);
 els.goodSummaryBtn.addEventListener("click", markSummaryGood);
