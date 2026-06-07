@@ -656,6 +656,11 @@ if (hasExtensionContext()) {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message?.type !== MESSAGE_TYPES.collectChatMessages) return false;
 
+    if (!isTargetPage()) {
+      sendResponse({ ok: false, conversation: null, messages: [], reason: "Open Reddit Chat first." });
+      return false;
+    }
+
     try {
       const conversation = extractConversation();
       sendResponse({ ok: true, conversation, messages: conversation.messages });

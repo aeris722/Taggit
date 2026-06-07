@@ -396,10 +396,16 @@ select {
   cursor: pointer;
 }
 
-.row {
+.row,
+.form-grid {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.form-grid > div {
+  min-width: 0;
+  flex: 1;
 }
 
 .row input {
@@ -782,6 +788,43 @@ button[type="submit"]:active,
   font-size: 13px;
   font-weight: 600;
   overflow-wrap: anywhere;
+}
+
+.item-detail-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.meta-chip {
+  max-width: 100%;
+  padding: 2px 8px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.follow-up-chip {
+  color: var(--accent2);
+  border-color: rgba(76, 201, 240, 0.32);
+}
+
+.follow-up-chip.is-due {
+  color: var(--success);
+  border-color: rgba(53, 211, 153, 0.42);
+}
+
+.follow-up-chip.is-overdue {
+  color: var(--danger);
+  border-color: rgba(255, 92, 122, 0.42);
 }
 
 .desc {
