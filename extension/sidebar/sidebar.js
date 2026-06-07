@@ -16,6 +16,11 @@ const els = {
   tagCharCount: document.getElementById("tagCharCount"),
   tagSuggestions: document.getElementById("tagSuggestions"),
   list: document.getElementById("taggedList"),
+  askBtn: document.getElementById("askBtn"),
+  askInput: document.getElementById("askInput"),
+  askResults: document.getElementById("askResults"),
+  dailyActionList: document.getElementById("dailyActionList"),
+  dailyBrief: document.getElementById("dailyBrief"),
   clearAllBtn: document.getElementById("clearAllBtn"),
   clearFilterBtn: document.getElementById("clearFilterBtn"),
   colorPicker: document.getElementById("colorPicker"),
@@ -60,6 +65,7 @@ const els = {
   noteTemplates: document.getElementById("noteTemplates"),
   uniqueStat: document.getElementById("uniqueStat"),
   viewSelect: document.getElementById("viewSelect"),
+  weeklyReviewGrid: document.getElementById("weeklyReviewGrid"),
 };
 
 const UI_PREFS_KEY = "taggitSidebarPrefs";
@@ -79,6 +85,10 @@ const VIEW_MODES = new Set([
   "dueToday",
   "overdue",
   "opportunities",
+  "cooling",
+  "waiting",
+  "noNextStep",
+  "recentlyActive",
   "withNotes",
   "withoutNotes",
   "archived",
@@ -97,6 +107,10 @@ const DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
   minute: "2-digit",
   month: "short",
 });
+const DAY_MS = 24 * 60 * 60 * 1000;
+const QUICK_ASK_STOP_WORDS = new Set([
+  "a", "an", "and", "are", "for", "from", "in", "is", "me", "of", "or", "show", "the", "to", "who", "which", "with",
+]);
 
 let currentContext = null;
 let taggedConversations = [];
@@ -270,6 +284,125 @@ function formatFollowUpDate(value) {
 
   const date = new Date(`${value}T00:00:00`);
   return Number.isNaN(date.getTime()) ? value : DATE_FORMATTER.format(date);
+}
+
+function parseDateString(value) {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function daysSinceTimestamp(ts) {
+  const time = Number(ts) || Date.now();
+  return Math.max(0, Math.floor((Date.now() - time) / DAY_MS));
+}
+
+function daysUntilDateString(value) {
+  const date = parseDateString(value);
+  if (!date) return null;
+  const today = parseDateString(getTodayDateString());
+  return Math.ceil((date.getTime() - today.getTime()) / DAY_MS);
+}
+
+function isRecentlyActive(item) {
+  return daysSinceTimestamp(item.updatedAt || item.createdAt) <= 7;
+}
+
+function hasNextStep(item) {
+  if (!item || item.status === "closed") return true;
+  if (hasFollowUp(item)) return true;
+  if (item.status === "waiting") return true;
+  return /\b(next step|follow up|follow-up|todo|to do|waiting|circle back|check in|reply|send|schedule)\b/i.test(
+    item.description || ""
+  );
+}
+
+function isOpportunityCooling(item) {
+  if (item?.status !== "opportunity") return false;
+  if (isOverdue(item)) return true;
+  return daysSinceTimestamp(item.updatedAt || item.createdAt) >= 5 && !isDueToday(item);
+}
+
+function getActiveConversations() {
+  return taggedConversations.filter((item) => !isArchived(item) && item.status !== "closed");
+}
+
+function getRelationshipHealth(item) {
+  let score = 72;
+  const daysInactive = daysSinceTimestamp(item.updatedAt || item.createdAt);
+  const dueOffset = daysUntilDateString(item.followUpAt);
+  const noteLength = (item.description || "").trim().length;
+
+  if (item.status === "opportunity") score += 10;
+  if (item.status === "waiting") score += 4;
+  if (isPinned(item)) score += 6;
+  if (noteLength >= 160) score += 8;
+  if (noteLength === 0) score -= 12;
+  if (!hasNextStep(item)) score -= 14;
+  if (daysInactive > 7) score -= Math.min(18, Math.floor((daysInactive - 7) / 3) * 3);
+  if (dueOffset !== null && dueOffset < 0) score -= Math.min(28, Math.abs(dueOffset) * 4);
+  if (dueOffset === 0) score -= 4;
+  if (item.status === "closed") score = Math.min(score, 58);
+
+  score = Math.max(0, Math.min(100, score));
+  const label = score >= 78 ? "Healthy" : score >= 55 ? "Needs attention" : "At risk";
+  return { score, label };
+}
+
+function getSuggestedNextAction(item) {
+  if (isOverdue(item)) return `Send overdue follow-up from ${formatFollowUpDate(item.followUpAt)}.`;
+  if (isDueToday(item)) return "Follow up today while the thread is warm.";
+  if (isOpportunityCooling(item)) return "Re-open the opportunity or decide to close it.";
+  if (!hasNextStep(item)) return "Add a concrete next step or follow-up date.";
+  if (item.status === "waiting") return "Check whether you are still waiting or can move it forward.";
+  if (!(item.description || "").trim()) return "Add memory notes so future you knows why this matters.";
+  return "Review the latest note and decide whether to reply, wait, or close.";
+}
+
+function extractKeywords(text, limit = 5) {
+  const matches = String(text || "")
+    .toLowerCase()
+    .match(/[a-z0-9][a-z0-9-]{2,}/g) || [];
+  const counts = new Map();
+  matches
+    .filter((word) => !QUICK_ASK_STOP_WORDS.has(word))
+    .forEach((word) => counts.set(word, (counts.get(word) || 0) + 1));
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([word]) => word);
+}
+
+function createRelationshipMemory(item) {
+  const note = (item.description || "").trim();
+  const keywords = extractKeywords(`${item.tag} ${note}`, 5);
+  const openThread = note
+    .split(/\n|\. /)
+    .find((line) => /\b(next|follow|waiting|open|todo|help|ask|reply|schedule|intro)\b/i.test(line.trim()));
+
+  return {
+    summary: note
+      ? note.slice(0, 180)
+      : `Saved @${item.username || "Unknown"} as ${item.tag}; add notes to build relationship memory.`,
+    keyTopics: keywords.length ? keywords : [item.tag].filter(Boolean),
+    goals: (note.match(/\b(?:wants?|needs?|looking for|trying to|building|hiring|seeking)\b[^.\n]*/i) || [""])[0],
+    interests: (note.match(/\b(?:interested in|likes?|cares about|focused on)\b[^.\n]*/i) || [""])[0],
+    openThreads: openThread || (!hasNextStep(item) ? "No clear next step captured." : "Next step is captured."),
+    suggestedNextAction: getSuggestedNextAction(item),
+  };
+}
+
+function getActionMetrics() {
+  const active = getActiveConversations();
+  return {
+    dueToday: active.filter(isDueToday),
+    overdue: active.filter(isOverdue),
+    opportunities: active.filter((item) => item.status === "opportunity"),
+    cooling: active.filter(isOpportunityCooling),
+    waiting: active.filter((item) => item.status === "waiting"),
+    noNextStep: active.filter((item) => !hasNextStep(item)),
+    recentlyActive: active.filter(isRecentlyActive),
+  };
 }
 
 function appendText(parent, text) {
@@ -450,6 +583,14 @@ function createTaggedItem(item) {
   statusBadge.textContent = getStatusLabel(item.status);
   detailRow.appendChild(statusBadge);
 
+  const health = getRelationshipHealth(item);
+  const healthBadge = document.createElement("span");
+  healthBadge.className = "meta-chip health-chip";
+  healthBadge.dataset.health = health.label.toLowerCase().replace(/\s+/g, "-");
+  healthBadge.textContent = `${health.score} · ${health.label}`;
+  healthBadge.title = "Relationship health score based on recency, follow-up age, status, notes, and next-step clarity.";
+  detailRow.appendChild(healthBadge);
+
   if (hasFollowUp(item)) {
     const followUpBadge = document.createElement("span");
     followUpBadge.className = "meta-chip follow-up-chip";
@@ -469,6 +610,20 @@ function createTaggedItem(item) {
     desc.textContent = item.description;
     listItem.appendChild(desc);
   }
+
+  const memory = createRelationshipMemory(item);
+  const memoryBox = document.createElement("div");
+  memoryBox.className = "relationship-memory";
+  const memoryTitle = document.createElement("span");
+  memoryTitle.className = "memory-title";
+  memoryTitle.textContent = "Memory";
+  const memoryText = document.createElement("p");
+  memoryText.textContent = memory.suggestedNextAction;
+  const topics = document.createElement("span");
+  topics.className = "subtle-text";
+  topics.textContent = memory.keyTopics.length ? `Topics: ${memory.keyTopics.join(", ")}` : "Topics: none yet";
+  memoryBox.append(memoryTitle, memoryText, topics);
+  listItem.appendChild(memoryBox);
 
   listItem.appendChild(createOpenChatButton(getBestChatHref(item), "link-btn"));
 
@@ -545,6 +700,10 @@ function getFilteredConversations() {
       if (activeViewMode === "dueToday" && !isDueToday(item)) return false;
       if (activeViewMode === "overdue" && !isOverdue(item)) return false;
       if (activeViewMode === "opportunities" && item.status !== "opportunity") return false;
+      if (activeViewMode === "cooling" && !isOpportunityCooling(item)) return false;
+      if (activeViewMode === "waiting" && item.status !== "waiting") return false;
+      if (activeViewMode === "noNextStep" && hasNextStep(item)) return false;
+      if (activeViewMode === "recentlyActive" && !isRecentlyActive(item)) return false;
       if (activeViewMode === "withNotes" && !item.description?.trim()) return false;
       if (activeViewMode === "withoutNotes" && item.description?.trim()) return false;
       if (tagFilter && (item.tag || "").toLowerCase() !== tagFilter) return false;
@@ -556,15 +715,102 @@ function getFilteredConversations() {
 }
 
 function renderStats() {
-  const total = taggedConversations.length;
-  const pinnedCount = taggedConversations.filter(isPinned).length;
-  const notes = taggedConversations.filter((item) => item.description?.trim()).length;
-  const unique = new Set(taggedConversations.map((item) => (item.tag || "").trim().toLowerCase()).filter(Boolean));
+  const metrics = getActionMetrics();
+  els.totalStat.textContent = String(metrics.dueToday.length);
+  els.pinnedStat.textContent = String(metrics.overdue.length);
+  els.notesStat.textContent = String(metrics.opportunities.length);
+  els.uniqueStat.textContent = String(metrics.noNextStep.length);
+}
 
-  els.totalStat.textContent = String(total);
-  els.pinnedStat.textContent = String(pinnedCount);
-  els.notesStat.textContent = String(notes);
-  els.uniqueStat.textContent = String(unique.size);
+function createActionCard(item, reason = "") {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "daily-action-card";
+  button.dataset.action = "edit";
+  button.dataset.id = getItemKey(item);
+
+  const health = getRelationshipHealth(item);
+  const title = document.createElement("strong");
+  title.textContent = `@${item.username || "Unknown"}`;
+  const meta = document.createElement("span");
+  meta.textContent = `${reason || getStatusLabel(item.status)} · ${health.score} health`;
+  const action = document.createElement("p");
+  action.textContent = getSuggestedNextAction(item);
+  button.append(title, meta, action);
+  return button;
+}
+
+function renderCommandCenter() {
+  const metrics = getActionMetrics();
+  const actionItems = [
+    ...metrics.overdue.map((item) => ({ item, reason: "Overdue" })),
+    ...metrics.dueToday.map((item) => ({ item, reason: "Due today" })),
+    ...metrics.cooling.map((item) => ({ item, reason: "Cooling opportunity" })),
+    ...metrics.noNextStep.map((item) => ({ item, reason: "No next step" })),
+  ];
+  const seen = new Set();
+  const uniqueItems = actionItems
+    .filter(({ item }) => {
+      const key = getItemKey(item);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => getRelationshipHealth(a.item).score - getRelationshipHealth(b.item).score)
+    .slice(0, 4);
+
+  const totalActions = metrics.overdue.length + metrics.dueToday.length + metrics.cooling.length + metrics.noNextStep.length;
+  els.dailyBrief.textContent = totalActions
+    ? `${totalActions} relationship action${totalActions === 1 ? "" : "s"}`
+    : "Nothing urgent — review recent relationships.";
+
+  if (!taggedConversations.length) {
+    els.dailyActionList.textContent = "Save a Reddit chat, add a follow-up date, and Taggit will tell you who needs attention tomorrow.";
+    return;
+  }
+
+  if (!uniqueItems.length) {
+    const recent = metrics.recentlyActive.slice(0, 3);
+    els.dailyActionList.replaceChildren(
+      ...(recent.length
+        ? recent.map((item) => createActionCard(item, "Recently active"))
+        : [document.createTextNode("No urgent actions. Add follow-up dates or next steps to turn saved chats into a daily workflow.")])
+    );
+    return;
+  }
+
+  els.dailyActionList.replaceChildren(...uniqueItems.map(({ item, reason }) => createActionCard(item, reason)));
+}
+
+function renderWeeklyReview() {
+  const oneWeekAgo = Date.now() - 7 * DAY_MS;
+  const activeThisWeek = taggedConversations.filter((item) => (item.updatedAt || item.createdAt || 0) >= oneWeekAgo);
+  const completed = activeThisWeek.filter((item) => item.status === "closed");
+  const stalled = getActionMetrics().cooling;
+  const important = taggedConversations
+    .filter((item) => !isArchived(item) && (isPinned(item) || item.status === "opportunity" || getRelationshipHealth(item).score >= 78))
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+    .slice(0, 4);
+
+  const groups = [
+    ["Talked this week", activeThisWeek],
+    ["Completed", completed],
+    ["Stalled opportunities", stalled],
+    ["Becoming important", important],
+  ];
+
+  els.weeklyReviewGrid.replaceChildren(...groups.map(([label, items]) => {
+    const block = document.createElement("div");
+    block.className = "review-block";
+    const count = document.createElement("strong");
+    count.textContent = String(items.length);
+    const title = document.createElement("span");
+    title.textContent = label;
+    const names = document.createElement("p");
+    names.textContent = items.slice(0, 3).map((item) => `@${item.username || "Unknown"}`).join(", ") || "None yet";
+    block.append(count, title, names);
+    return block;
+  }));
 }
 
 function pruneSelectedIds() {
@@ -596,6 +842,8 @@ function renderList() {
   els.importTagsBtn.disabled = false;
   els.clearFilterBtn.hidden = !filterText.trim() && !activeTagFilter;
   renderStats();
+  renderCommandCenter();
+  renderWeeklyReview();
   renderTagSuggestions();
   renderTagCloud();
   renderBulkToolbar(filtered);
@@ -977,6 +1225,83 @@ function copyMarkdown() {
   copyText(formatMarkdown(), "Markdown copied.");
 }
 
+function buildSearchHaystack(item) {
+  const memory = createRelationshipMemory(item);
+  return [
+    item.tag,
+    item.username,
+    item.description,
+    item.status,
+    item.followUpAt,
+    memory.summary,
+    memory.keyTopics.join(" "),
+    memory.goals,
+    memory.interests,
+    memory.openThreads,
+  ].join(" ").toLowerCase();
+}
+
+function answerAskTaggit(question) {
+  const q = String(question || "").trim().toLowerCase();
+  if (!q) return [];
+
+  const active = getActiveConversations();
+  if (/overdue|late|missed/.test(q)) return active.filter(isOverdue);
+  if (/follow.?up|needs attention|due/.test(q)) {
+    return [...getActionMetrics().overdue, ...getActionMetrics().dueToday].filter((item, index, arr) =>
+      arr.findIndex((other) => getItemKey(other) === getItemKey(item)) === index
+    );
+  }
+  if (/opportunit|cooling|stalled/.test(q)) return active.filter((item) => item.status === "opportunity" || isOpportunityCooling(item));
+  if (/waiting/.test(q)) return active.filter((item) => item.status === "waiting");
+  if (/no next|next step|unclear/.test(q)) return active.filter((item) => !hasNextStep(item));
+  if (/help|asked for help|needs help/.test(q)) return active.filter((item) => /\b(help|stuck|question|advice|how do i|can you|need)\b/i.test(item.description || ""));
+  if (/ai|artificial intelligence|llm|gpt|gemini|machine learning/.test(q)) return active.filter((item) => /\b(ai|artificial intelligence|llm|gpt|gemini|machine learning|ml)\b/i.test(buildSearchHaystack(item)));
+
+  const terms = (q.match(/[a-z0-9][a-z0-9-]{2,}/g) || []).filter((term) => !QUICK_ASK_STOP_WORDS.has(term));
+  if (!terms.length) return [];
+
+  return active.filter((item) => {
+    const haystack = buildSearchHaystack(item);
+    return terms.some((term) => haystack.includes(term));
+  });
+}
+
+function renderAskResults(items, question = "") {
+  if (!question.trim()) {
+    els.askResults.textContent = "Ask a question to search saved notes, tags, statuses, and follow-up dates.";
+    return;
+  }
+
+  if (!items.length) {
+    els.askResults.textContent = "No local matches yet. Add richer notes or AI summaries to make Ask Taggit smarter.";
+    return;
+  }
+
+  const list = document.createElement("div");
+  list.className = "ask-result-list";
+  items.slice(0, 6).forEach((item) => {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "ask-result";
+    row.dataset.action = "edit";
+    row.dataset.id = getItemKey(item);
+    const title = document.createElement("strong");
+    title.textContent = `@${item.username || "Unknown"} · ${item.tag}`;
+    const detail = document.createElement("span");
+    detail.textContent = getSuggestedNextAction(item);
+    row.append(title, detail);
+    list.appendChild(row);
+  });
+
+  els.askResults.replaceChildren(list);
+}
+
+function askTaggit() {
+  const question = els.askInput.value;
+  renderAskResults(answerAskTaggit(question), question);
+}
+
 async function importTagsFromFile(file) {
   if (!file) return;
 
@@ -1349,6 +1674,18 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 els.form.addEventListener("submit", onSubmit);
 els.list.addEventListener("click", onClickList);
+els.dailyActionList.addEventListener("click", onClickList);
+els.askResults.addEventListener("click", onClickList);
+document.querySelectorAll("[data-view-shortcut]").forEach((button) => {
+  button.addEventListener("click", async () => {
+    viewMode = getValidViewMode(button.dataset.viewShortcut);
+    uiPrefs = { ...uiPrefs, viewMode };
+    els.viewSelect.value = viewMode;
+    selectedIds.clear();
+    renderList();
+    await saveUiPrefs();
+  });
+});
 els.clearAllBtn.addEventListener("click", clearAll);
 els.exportTagsBtn.addEventListener("click", () => exportTags());
 els.exportCsvBtn.addEventListener("click", () => exportCsv());
@@ -1424,6 +1761,16 @@ els.noteTemplates.addEventListener("click", (event) => {
   autoResizeTextarea(els.descInput);
   updateCounters();
   els.descInput.focus();
+});
+els.askBtn.addEventListener("click", askTaggit);
+els.askInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") askTaggit();
+});
+document.querySelectorAll("[data-ask]").forEach((button) => {
+  button.addEventListener("click", () => {
+    els.askInput.value = button.dataset.ask || "";
+    askTaggit();
+  });
 });
 els.clearFilterBtn.addEventListener("click", () => {
   filterText = "";
