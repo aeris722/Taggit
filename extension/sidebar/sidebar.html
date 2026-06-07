@@ -12,7 +12,7 @@
         <div class="brand-mark" aria-hidden="true">T</div>
         <div class="header-text">
           <h1>Taggit</h1>
-          <p>Tag and organize your Reddit conversations.</p>
+          <p>Remember people and manage Reddit relationships.</p>
         </div>
         <div class="header-actions">
           <button id="densityToggleBtn" class="icon-btn density-toggle" type="button" aria-label="Toggle compact density" aria-pressed="false" title="Toggle density">N</button>
@@ -20,23 +20,39 @@
         </div>
       </header>
 
-      <section class="stats-strip" aria-label="Tag stats">
-        <div class="stat">
+      <section class="stats-strip" aria-label="Daily relationship metrics">
+        <button class="stat action-stat" type="button" data-view-shortcut="dueToday">
           <span id="totalStat" class="stat-value">0</span>
-          <span class="stat-label">Saved</span>
-        </div>
-        <div class="stat">
+          <span class="stat-label">Due Today</span>
+        </button>
+        <button class="stat action-stat" type="button" data-view-shortcut="overdue">
           <span id="pinnedStat" class="stat-value">0</span>
-          <span class="stat-label">Pinned</span>
-        </div>
-        <div class="stat">
+          <span class="stat-label">Overdue</span>
+        </button>
+        <button class="stat action-stat" type="button" data-view-shortcut="opportunities">
           <span id="notesStat" class="stat-value">0</span>
-          <span class="stat-label">Notes</span>
-        </div>
-        <div class="stat">
+          <span class="stat-label">Opportunities</span>
+        </button>
+        <button class="stat action-stat" type="button" data-view-shortcut="noNextStep">
           <span id="uniqueStat" class="stat-value">0</span>
-          <span class="stat-label">Tags</span>
+          <span class="stat-label">No Next Step</span>
+        </button>
+      </section>
+
+      <section class="card command-center" aria-labelledby="commandCenterTitle">
+        <div class="section-heading">
+          <span id="commandCenterTitle" class="card-title">Today&apos;s Command Center</span>
+          <span id="dailyBrief" class="subtle-text">Loading...</span>
         </div>
+        <div id="dailyActionList" class="daily-action-list" aria-live="polite"></div>
+      </section>
+
+      <section class="card weekly-review" aria-labelledby="weeklyReviewTitle">
+        <div class="section-heading">
+          <span id="weeklyReviewTitle" class="card-title">Weekly Review</span>
+          <span class="subtle-text">Last 7 days</span>
+        </div>
+        <div id="weeklyReviewGrid" class="weekly-review-grid"></div>
       </section>
 
       <section class="card">
@@ -115,6 +131,24 @@
         <div id="summaryOutput" class="summary-output" tabindex="0">No summary yet.</div>
       </section>
 
+      <section class="card ask-card" aria-labelledby="askTitle">
+        <div class="section-heading">
+          <span id="askTitle" class="card-title">Ask Taggit</span>
+          <span class="subtle-text">Search local memory</span>
+        </div>
+        <div class="ask-row">
+          <input id="askInput" type="search" placeholder="e.g. who needs follow-up? who mentioned startups?" aria-label="Ask Taggit" />
+          <button id="askBtn" type="button">Ask</button>
+        </div>
+        <div class="ask-examples" aria-label="Example Ask Taggit questions">
+          <button class="suggestion-chip" type="button" data-ask="Who needs follow-up?">Follow-up</button>
+          <button class="suggestion-chip" type="button" data-ask="Which contacts are overdue?">Overdue</button>
+          <button class="suggestion-chip" type="button" data-ask="Who mentioned startups?">Startups</button>
+          <button class="suggestion-chip" type="button" data-ask="Who asked for help?">Asked for help</button>
+        </div>
+        <div id="askResults" class="ask-results" aria-live="polite">Ask a question to search saved notes, tags, statuses, and follow-up dates.</div>
+      </section>
+
       <section class="card">
         <div class="list-header">
           <div>
@@ -146,6 +180,10 @@
             <option value="dueToday">Due today</option>
             <option value="overdue">Overdue</option>
             <option value="opportunities">Opportunities</option>
+            <option value="cooling">Cooling off</option>
+            <option value="waiting">Waiting</option>
+            <option value="noNextStep">No next step</option>
+            <option value="recentlyActive">Recently active</option>
             <option value="withNotes">With notes</option>
             <option value="withoutNotes">No notes</option>
             <option value="archived">Archived</option>
