@@ -925,8 +925,18 @@ async function loadState() {
     ]);
     currentContext = state.context;
     taggedConversations = state.tags;
-    aiSettings = aiData[TAGGIT_KEYS.aiSettings] || { apiKey: "" };
-    uiPrefs = { ...DEFAULT_UI_PREFS, ...(prefsData[UI_PREFS_KEY] || {}) };
+
+    const loadedAiSettings = aiData[TAGGIT_KEYS.aiSettings];
+    aiSettings =
+      loadedAiSettings && typeof loadedAiSettings === "object" && !Array.isArray(loadedAiSettings)
+        ? { apiKey: String(loadedAiSettings.apiKey || "") }
+        : { apiKey: "" };
+
+    const loadedPrefs = prefsData[UI_PREFS_KEY];
+    uiPrefs =
+      loadedPrefs && typeof loadedPrefs === "object" && !Array.isArray(loadedPrefs)
+        ? { ...DEFAULT_UI_PREFS, ...loadedPrefs }
+        : { ...DEFAULT_UI_PREFS };
     uiPrefs.archivedIds = Array.isArray(uiPrefs.archivedIds) ? uiPrefs.archivedIds : [];
     uiPrefs.pinnedIds = Array.isArray(uiPrefs.pinnedIds) ? uiPrefs.pinnedIds : [];
     sortMode = getValidSortMode(uiPrefs.sortMode);
@@ -962,10 +972,10 @@ function renderSummary(text, messageCount) {
 
   els.summaryOutput.textContent = looksTooShort
     ? [
-        displayText || "Gemini returned a very short summary.",
-        "",
-        `Captured ${messageCount} visible chat messages. Open the exact conversation before summarizing.`,
-      ].join("\n")
+      displayText || "Gemini returned a very short summary.",
+      "",
+      `Captured ${messageCount} visible chat messages. Open the exact conversation before summarizing.`,
+    ].join("\n")
     : displayText;
 
   latestSummaryNote = note.slice(0, LIMITS.noteMaxLength);
@@ -1308,14 +1318,17 @@ async function importTagsFromFile(file) {
   try {
     const raw = await file.text();
     const payload = JSON.parse(raw);
-    const incoming = normalizeTags(Array.isArray(payload) ? payload : payload.tags);
+    const incoming = normalizeTags(Array.isArray(payload) ? payload : payload?.tags || []);
     if (!incoming.length) {
       setStatus("No valid tags found.", "error");
       return;
     }
 
     const byId = new Map(taggedConversations.map((tag) => [getItemKey(tag), tag]));
-    incoming.forEach((tag) => byId.set(getItemKey(tag), tag));
+    incoming.forEach((tag) => {
+      const key = getItemKey(tag);
+      if (key) byId.set(key, tag);
+    });
     taggedConversations = normalizeTags([...byId.values()]);
     await save();
     renderList();
@@ -1325,7 +1338,9 @@ async function importTagsFromFile(file) {
     console.warn("[Taggit] Failed to import tags.", error);
     setStatus("Import failed.", "error");
   } finally {
-    els.importFileInput.value = "";
+    if (els.importFileInput) {
+      els.importFileInput.value = "";
+    }
   }
 }
 
@@ -1465,15 +1480,19 @@ async function archiveSelected() {
 }
 
 async function saveSummary(conversation, summary) {
-  const roomId = conversation.roomId || currentContext?.conversationId || "latest";
+  const roomId =
+    conversation.roomId ||
+    currentContext?.conversationId ||
+    getConversationId(conversation) ||
+    `latest-${Date.now()}`;
   const data = await chrome.storage.local.get(TAGGIT_KEYS.summaries);
   const summaries = data[TAGGIT_KEYS.summaries] || {};
   summaries[roomId] = {
     roomId,
-    participants: conversation.participants || [],
+    participants: Array.isArray(conversation.participants) ? conversation.participants : [],
     messageCount: conversation.messages?.length || 0,
     summary: summary.summary,
-    tags: summary.tags || [],
+    tags: Array.isArray(summary.tags) ? summary.tags : [],
     updatedAt: Date.now(),
   };
   await chrome.storage.local.set({ [TAGGIT_KEYS.summaries]: summaries });

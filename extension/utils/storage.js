@@ -11,32 +11,41 @@
     return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : "";
   }
 
-  function normalizeUrl(value) {
-    if (!value) return "";
+  function parseUrl(value) {
+    if (!value) return null;
 
     try {
-      const url = new URL(value);
-      const path = url.pathname.replace(/\/$/, "");
-      if (path === "/chat") return "";
-
-      url.hash = "";
-      url.search = "";
-      return url.href.replace(/\/$/, "").toLowerCase();
+      return new URL(value);
     } catch {
-      return "";
+      try {
+        const base = typeof location !== "undefined" && location?.origin ? location.origin : "https://www.reddit.com";
+        return new URL(value, base);
+      } catch {
+        return null;
+      }
     }
+  }
+
+  function normalizeUrl(value) {
+    const url = parseUrl(value);
+    if (!url) return "";
+
+    const path = url.pathname.replace(/\/$/, "");
+    if (path === "/chat") return "";
+
+    url.hash = "";
+    url.search = "";
+    return url.href.replace(/\/$/, "").toLowerCase();
   }
 
   function getSafeChatHref(value) {
     if (!value) return "";
 
-    try {
-      const url = new URL(value);
-      const isReddit = url.hostname === "reddit.com" || url.hostname.endsWith(".reddit.com");
-      return isReddit && url.pathname.startsWith("/chat") ? url.href : "";
-    } catch {
-      return "";
-    }
+    const url = parseUrl(value);
+    if (!url) return "";
+
+    const isReddit = url.hostname === "reddit.com" || url.hostname.endsWith(".reddit.com");
+    return isReddit && url.pathname.startsWith("/chat") ? url.href : "";
   }
 
   function getBestChatHref(input = {}) {
@@ -63,13 +72,16 @@
     const tag = cleanString(item.tag, LIMITS.tagMaxLength);
     if (!conversationId || !tag) return null;
 
+    const id = cleanString(item.id, 500) || conversationId;
+    const href = getSafeChatHref(cleanString(item.href, 500));
+
     return {
-      id: cleanString(item.id, 500) || conversationId,
+      id,
       conversationId,
       tag,
       color: cleanString(item.color, 32) || globalThis.TaggitConstants.DEFAULT_TAG_COLOR,
       username: cleanString(item.username, 80) || "Unknown",
-      href: getSafeChatHref(cleanString(item.href, 500)),
+      href,
       description: cleanString(item.description, LIMITS.noteMaxLength),
       status: normalizeStatus(item.status),
       followUpAt: cleanDate(item.followUpAt),
@@ -113,6 +125,10 @@
     await chrome.storage.local.set({ [TAGGIT_KEYS.tags]: normalizeTags(tags) });
   }
 
+  function getItemKey(item = {}) {
+    return cleanString(item.conversationId, 500) || cleanString(item.id, 500) || "";
+  }
+
   function upsertTag(tags, nextTag) {
     const normalized = normalizeTag(nextTag);
     if (!normalized) return tags;
@@ -128,6 +144,8 @@
         id: existing.id,
         createdAt: existing.createdAt,
         updatedAt: Date.now(),
+        href: normalized.href || existing.href || "",
+        username: normalized.username || existing.username || "Unknown",
       };
       return tags;
     }
@@ -136,7 +154,11 @@
   }
 
   function createTagMap(tags) {
-    return new Map(normalizeTags(tags).map((item) => [item.conversationId || item.id, item]));
+    return new Map(
+      normalizeTags(tags)
+        .filter((item) => item.conversationId || item.id)
+        .map((item) => [item.conversationId || item.id, item])
+    );
   }
 
   globalThis.TaggitStorage = {
