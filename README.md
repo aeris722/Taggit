@@ -25,16 +25,6 @@ Version 1 is focused on a stable, useful MVP:
 - Store data locally with `chrome.storage.local`
 - Runs only on Reddit chat pages
 
-## Screenshots
-
-Add Chrome Web Store screenshots here before publishing:
-
-```text
-docs/screenshots/sidebar.png
-docs/screenshots/reddit-chat-tag-button.png
-docs/screenshots/filtering.png
-```
-
 ## Install Locally
 
 1. Open Chrome.
@@ -94,24 +84,6 @@ taggit/
 - Conversation identity uses chat `href` first, username fallback second
 - CSP-safe extension UI with no remote fonts or scripts
 - Optional Gemini summaries via `generativelanguage.googleapis.com`
-
-## Chrome Web Store Checklist
-
-- Add final screenshots
-- Add a privacy policy page
-- Confirm extension name, description, and icon
-- Test install with `extension/` as the unpacked folder
-- Test on `reddit.com/chat/` and `www.reddit.com/chat/`
-- Verify no console errors during normal use
-
-## Roadmap
-
-- AI conversation summaries
-- Better message extraction for Reddit DOM changes
-- Optional Firebase auth support
-- Export/import local tags
-- Additional tag management controls
-- Chrome Web Store release assets
 
 ## Development
 
