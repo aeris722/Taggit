@@ -452,10 +452,7 @@ class RedditChatTagInjector {
 
     const ariaLabel = anchor.getAttribute("aria-label") || "";
     const rawHref = anchor.getAttribute("href") || "";
-    const href =
-      getSafeChatHref(getAbsoluteHref(rawHref)) ||
-      getSafeChatHref(window.location.href) ||
-      "";
+    const href = getSafeChatHref(getAbsoluteHref(rawHref)) || "";
     const usernameFromLabel = ariaLabel
       .replace(/^Direct chat(?: with)?\s*/i, "")
       .replace(/\s*\(.*\)\s*$/, "")

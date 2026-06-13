@@ -12,52 +12,17 @@
         <div class="brand-mark" aria-hidden="true">T</div>
         <div class="header-text">
           <h1>Taggit</h1>
-          <p>Remember people and manage Reddit relationships.</p>
+          <p>Save Reddit chats, notes, and follow-ups.</p>
         </div>
         <div class="header-actions">
-          <button id="densityToggleBtn" class="icon-btn density-toggle" type="button" aria-label="Toggle compact density" aria-pressed="false" title="Toggle density">N</button>
-          <button id="themeToggleBtn" class="icon-btn theme-toggle" type="button" aria-label="Toggle light theme" aria-pressed="false" title="Toggle theme">D</button>
+          <button id="densityToggleBtn" class="icon-btn density-toggle" type="button" aria-label="Toggle compact density" aria-pressed="false" title="Toggle density">↕</button>
+          <button id="themeToggleBtn" class="icon-btn theme-toggle" type="button" aria-label="Toggle light theme" aria-pressed="false" title="Toggle theme">☾</button>
         </div>
       </header>
 
-      <section class="stats-strip" aria-label="Daily relationship metrics">
-        <button class="stat action-stat" type="button" data-view-shortcut="dueToday">
-          <span id="totalStat" class="stat-value">0</span>
-          <span class="stat-label">Due Today</span>
-        </button>
-        <button class="stat action-stat" type="button" data-view-shortcut="overdue">
-          <span id="pinnedStat" class="stat-value">0</span>
-          <span class="stat-label">Overdue</span>
-        </button>
-        <button class="stat action-stat" type="button" data-view-shortcut="opportunities">
-          <span id="notesStat" class="stat-value">0</span>
-          <span class="stat-label">Opportunities</span>
-        </button>
-        <button class="stat action-stat" type="button" data-view-shortcut="noNextStep">
-          <span id="uniqueStat" class="stat-value">0</span>
-          <span class="stat-label">No Next Step</span>
-        </button>
-      </section>
-
-      <section class="card command-center" aria-labelledby="commandCenterTitle">
+      <section class="card primary-card">
         <div class="section-heading">
-          <span id="commandCenterTitle" class="card-title">Today&apos;s Command Center</span>
-          <span id="dailyBrief" class="subtle-text">Loading...</span>
-        </div>
-        <div id="dailyActionList" class="daily-action-list" aria-live="polite"></div>
-      </section>
-
-      <section class="card weekly-review" aria-labelledby="weeklyReviewTitle">
-        <div class="section-heading">
-          <span id="weeklyReviewTitle" class="card-title">Weekly Review</span>
-          <span class="subtle-text">Last 7 days</span>
-        </div>
-        <div id="weeklyReviewGrid" class="weekly-review-grid"></div>
-      </section>
-
-      <section class="card">
-        <div class="section-heading">
-          <span class="card-title">Conversation</span>
+          <span class="card-title">Current Conversation</span>
           <span id="formMode" class="subtle-text">Select a chat</span>
         </div>
         <div id="contextPreview" class="context-preview" aria-live="polite">No conversation selected yet.</div>
@@ -67,43 +32,43 @@
           <div id="colorPicker" role="radiogroup" aria-labelledby="colorPickerLabel"></div>
 
           <div class="label-row">
-            <label for="tagInput">Tag Label</label>
+            <label for="tagInput">Tag</label>
             <span id="tagCharCount" class="counter">0/28</span>
           </div>
           <div class="row">
-            <input id="tagInput" type="text" placeholder="e.g. friend, work, follow-up" maxlength="28" required />
+            <input id="tagInput" type="text" placeholder="e.g. friend, lead, follow-up" maxlength="28" required />
             <button id="saveBtn" type="submit">Save</button>
           </div>
           <div id="tagSuggestions" class="suggestion-row" aria-label="Quick tag suggestions"></div>
 
-          <div class="form-grid">
-            <div>
-              <label for="statusSelect">Status</label>
-              <select id="statusSelect" aria-label="Conversation relationship status">
-                <option value="new">New</option>
-                <option value="follow-up">Follow up</option>
-                <option value="waiting">Waiting</option>
-                <option value="opportunity">Opportunity</option>
-                <option value="closed">Closed</option>
-              </select>
-            </div>
-            <div>
-              <label for="followUpInput">Follow-up</label>
-              <input id="followUpInput" type="date" aria-label="Follow-up date" />
-            </div>
-          </div>
-
           <div class="label-row">
-            <label for="descInput">Description</label>
+            <label for="descInput">Note</label>
             <span id="descCharCount" class="counter">0/1600</span>
           </div>
-          <textarea id="descInput" placeholder="Add notes about this person..." maxlength="1600"></textarea>
+          <textarea id="descInput" placeholder="Why does this conversation matter?" maxlength="1600"></textarea>
           <div id="noteTemplates" class="suggestion-row" aria-label="Note templates">
             <button class="suggestion-chip" type="button" data-template="Follow up: ">Follow up</button>
             <button class="suggestion-chip" type="button" data-template="Context: ">Context</button>
             <button class="suggestion-chip" type="button" data-template="Next step: ">Next step</button>
-            <button class="suggestion-chip" type="button" data-template="Watch for: ">Watch for</button>
           </div>
+
+          <div class="form-grid follow-up-grid">
+            <div>
+              <label for="followUpInput">Follow-up</label>
+              <input id="followUpInput" type="date" aria-label="Follow-up date" />
+            </div>
+            <div>
+              <label for="statusSelect">Status</label>
+              <select id="statusSelect" aria-label="Conversation status">
+                <option value="new">Active</option>
+                <option value="follow-up">Follow up</option>
+                <option value="waiting">Waiting</option>
+                <option value="opportunity">Important</option>
+                <option value="closed">Done</option>
+              </select>
+            </div>
+          </div>
+
           <div class="form-footer">
             <button id="resetFormBtn" class="text-btn" type="button">Reset</button>
             <span id="saveStatus" class="status-text" role="status" aria-live="polite"></span>
@@ -111,50 +76,51 @@
         </form>
       </section>
 
-      <section class="card">
-        <div class="section-heading">
-          <span class="card-title">AI Summary</span>
-          <span id="summaryStatus" class="subtle-text" role="status" aria-live="polite"></span>
-        </div>
-        <label for="apiKeyInput">Gemini API Key</label>
-        <input id="apiKeyInput" type="password" placeholder="Paste your Gemini API key" autocomplete="off" />
-        <div class="summary-actions">
-          <button id="saveApiKeyBtn" class="ghost-btn" type="button">Save Key</button>
-          <button id="summarizeBtn" type="button">Summarize</button>
-        </div>
-        <div class="summary-feedback">
-          <button id="useSummaryBtn" class="ghost-btn" type="button" disabled>Use as Note</button>
-          <button id="copySummaryBtn" class="ghost-btn" type="button" disabled>Copy</button>
-          <button id="goodSummaryBtn" class="ghost-btn" type="button" disabled>Good</button>
-          <button id="badSummaryBtn" class="ghost-btn" type="button" disabled>Bad</button>
-        </div>
-        <div id="summaryOutput" class="summary-output" tabindex="0">No summary yet.</div>
-      </section>
-
-      <section class="card ask-card" aria-labelledby="askTitle">
-        <div class="section-heading">
-          <span id="askTitle" class="card-title">Ask Taggit</span>
-          <span class="subtle-text">Search local memory</span>
-        </div>
-        <div class="ask-row">
-          <input id="askInput" type="search" placeholder="e.g. who needs follow-up? who mentioned startups?" aria-label="Ask Taggit" />
-          <button id="askBtn" type="button">Ask</button>
-        </div>
-        <div class="ask-examples" aria-label="Example Ask Taggit questions">
-          <button class="suggestion-chip" type="button" data-ask="Who needs follow-up?">Follow-up</button>
-          <button class="suggestion-chip" type="button" data-ask="Which contacts are overdue?">Overdue</button>
-          <button class="suggestion-chip" type="button" data-ask="Who mentioned startups?">Startups</button>
-          <button class="suggestion-chip" type="button" data-ask="Who asked for help?">Asked for help</button>
-        </div>
-        <div id="askResults" class="ask-results" aria-live="polite">Ask a question to search saved notes, tags, statuses, and follow-up dates.</div>
-      </section>
-
-      <section class="card">
-        <div class="list-header">
+      <section class="card saved-card">
+        <div class="list-header compact-list-header">
           <div>
-            <span class="card-title">Tagged Conversations</span>
+            <span class="card-title">Saved Conversations</span>
             <span id="listCount" class="subtle-text"></span>
           </div>
+        </div>
+        <div class="filter-row primary-search">
+          <input id="filterInput" type="search" placeholder="Search tag, username, or note..." aria-label="Search saved conversations" />
+          <button id="clearFilterBtn" class="icon-btn" type="button" aria-label="Clear search">×</button>
+        </div>
+        <ul id="taggedList" class="tagged-list"></ul>
+
+        <details class="secondary-panel list-options-panel">
+          <summary>List options</summary>
+          <div class="control-grid">
+            <label for="sortSelect">Sort</label>
+            <select id="sortSelect" aria-label="Sort saved conversations">
+              <option value="newest">Newest updated</option>
+              <option value="oldest">Oldest updated</option>
+              <option value="tag">Tag A-Z</option>
+              <option value="username">Username A-Z</option>
+            </select>
+            <label for="viewSelect">View</label>
+            <select id="viewSelect" aria-label="View saved conversations">
+              <option value="active">Active</option>
+              <option value="all">All</option>
+              <option value="pinned">Pinned</option>
+              <option value="dueToday">Due today</option>
+              <option value="overdue">Overdue</option>
+              <option value="waiting">Waiting</option>
+              <option value="opportunities">Important</option>
+              <option value="noNextStep">No next step</option>
+              <option value="recentlyActive">Recently active</option>
+              <option value="withNotes">With notes</option>
+              <option value="withoutNotes">No notes</option>
+              <option value="cooling">Cooling off</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
+          <div id="tagCloud" class="tag-cloud" aria-label="Saved tag filters"></div>
+        </details>
+
+        <details class="secondary-panel data-panel">
+          <summary>Data and bulk actions</summary>
           <div class="list-actions">
             <button id="importTagsBtn" class="ghost-btn" type="button">Import</button>
             <button id="exportTagsBtn" class="ghost-btn" type="button">Export</button>
@@ -162,48 +128,67 @@
             <button id="copyMarkdownBtn" class="ghost-btn" type="button">Copy MD</button>
             <button id="clearAllBtn" class="ghost-btn danger-action" type="button">Clear All</button>
           </div>
-        </div>
-        <input id="importFileInput" class="visually-hidden" type="file" accept="application/json,.json" />
-        <div class="control-grid">
-          <label for="sortSelect">Sort</label>
-          <select id="sortSelect" aria-label="Sort tagged conversations">
-            <option value="newest">Newest updated</option>
-            <option value="oldest">Oldest updated</option>
-            <option value="tag">Tag A-Z</option>
-            <option value="username">Username A-Z</option>
-          </select>
-          <label for="viewSelect">View</label>
-          <select id="viewSelect" aria-label="View tagged conversations">
-            <option value="active">Active</option>
-            <option value="all">All</option>
-            <option value="pinned">Pinned</option>
-            <option value="dueToday">Due today</option>
-            <option value="overdue">Overdue</option>
-            <option value="opportunities">Opportunities</option>
-            <option value="cooling">Cooling off</option>
-            <option value="waiting">Waiting</option>
-            <option value="noNextStep">No next step</option>
-            <option value="recentlyActive">Recently active</option>
-            <option value="withNotes">With notes</option>
-            <option value="withoutNotes">No notes</option>
-            <option value="archived">Archived</option>
-          </select>
-        </div>
-        <div class="filter-row">
-          <input id="filterInput" type="search" placeholder="Filter by tag, username, or note..." aria-label="Filter tagged conversations" />
-          <button id="clearFilterBtn" class="icon-btn" type="button" aria-label="Clear filter">x</button>
-        </div>
-        <div id="tagCloud" class="tag-cloud" aria-label="Saved tag filters"></div>
-        <div id="bulkToolbar" class="bulk-toolbar" hidden>
-          <span id="selectedCount" class="subtle-text">0 selected</span>
-          <button id="selectVisibleBtn" class="ghost-btn" type="button">Select Visible</button>
-          <button id="exportSelectedBtn" class="ghost-btn" type="button">Export Selected</button>
-          <button id="archiveSelectedBtn" class="ghost-btn" type="button">Archive Selected</button>
-          <button id="deleteSelectedBtn" class="ghost-btn danger-action" type="button">Delete Selected</button>
-          <button id="clearSelectionBtn" class="ghost-btn" type="button">Clear</button>
-        </div>
-        <ul id="taggedList" class="tagged-list"></ul>
+          <input id="importFileInput" class="visually-hidden" type="file" accept="application/json,.json" />
+          <div id="bulkToolbar" class="bulk-toolbar" hidden>
+            <span id="selectedCount" class="subtle-text">0 selected</span>
+            <button id="selectVisibleBtn" class="ghost-btn" type="button">Select Visible</button>
+            <button id="exportSelectedBtn" class="ghost-btn" type="button">Export Selected</button>
+            <button id="archiveSelectedBtn" class="ghost-btn" type="button">Archive Selected</button>
+            <button id="deleteSelectedBtn" class="ghost-btn danger-action" type="button">Delete Selected</button>
+            <button id="clearSelectionBtn" class="ghost-btn" type="button">Clear</button>
+          </div>
+        </details>
       </section>
+
+      <details class="secondary-panel tools-panel">
+        <summary>Optional tools</summary>
+
+        <section class="card command-center" aria-labelledby="commandCenterTitle">
+          <div class="section-heading">
+            <span id="commandCenterTitle" class="card-title">Follow-up Agenda</span>
+            <span id="dailyBrief" class="subtle-text">Loading...</span>
+          </div>
+          <section class="stats-strip" aria-label="Follow-up counts">
+            <button class="stat action-stat" type="button" data-view-shortcut="dueToday">
+              <span id="totalStat" class="stat-value">0</span>
+              <span class="stat-label">Due Today</span>
+            </button>
+            <button class="stat action-stat" type="button" data-view-shortcut="overdue">
+              <span id="pinnedStat" class="stat-value">0</span>
+              <span class="stat-label">Overdue</span>
+            </button>
+            <button class="stat action-stat" type="button" data-view-shortcut="opportunities">
+              <span id="notesStat" class="stat-value">0</span>
+              <span class="stat-label">Important</span>
+            </button>
+            <button class="stat action-stat" type="button" data-view-shortcut="noNextStep">
+              <span id="uniqueStat" class="stat-value">0</span>
+              <span class="stat-label">No Next Step</span>
+            </button>
+          </section>
+          <div id="dailyActionList" class="daily-action-list" aria-live="polite"></div>
+        </section>
+
+        <section class="card ai-card">
+          <div class="section-heading">
+            <span class="card-title">AI Summary</span>
+            <span id="summaryStatus" class="subtle-text" role="status" aria-live="polite"></span>
+          </div>
+          <label for="apiKeyInput">Gemini API Key</label>
+          <input id="apiKeyInput" type="password" placeholder="Paste your Gemini API key" autocomplete="off" />
+          <div class="summary-actions">
+            <button id="saveApiKeyBtn" class="ghost-btn" type="button">Save Key</button>
+            <button id="summarizeBtn" type="button">Summarize</button>
+          </div>
+          <div class="summary-feedback">
+            <button id="useSummaryBtn" class="ghost-btn" type="button" disabled>Use as Note</button>
+            <button id="copySummaryBtn" class="ghost-btn" type="button" disabled>Copy</button>
+            <button id="goodSummaryBtn" class="ghost-btn" type="button" disabled hidden>Good</button>
+            <button id="badSummaryBtn" class="ghost-btn" type="button" disabled hidden>Bad</button>
+          </div>
+          <div id="summaryOutput" class="summary-output" tabindex="0">No summary yet.</div>
+        </section>
+      </details>
     </main>
     <script src="../utils/constants.js"></script>
     <script src="../utils/storage.js"></script>
