@@ -1139,3 +1139,74 @@ button:disabled:hover {
   color: var(--text);
   font-size: 12px;
 }
+
+.primary-card {
+  border-color: rgba(255, 106, 61, 0.22);
+}
+
+.saved-card {
+  border-color: rgba(76, 201, 240, 0.16);
+}
+
+.compact-list-header {
+  margin-bottom: -2px;
+}
+
+.primary-search {
+  margin-bottom: 2px;
+}
+
+.follow-up-grid {
+  align-items: end;
+}
+
+.secondary-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.secondary-panel > summary {
+  padding: 9px 11px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  list-style-position: inside;
+  text-transform: uppercase;
+}
+
+.secondary-panel[open] {
+  padding: 0 10px 10px;
+}
+
+.secondary-panel[open] > summary {
+  margin: 0 -10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tools-panel {
+  background: transparent;
+  border-color: var(--border);
+}
+
+.tools-panel > .card {
+  box-shadow: var(--shadow-tight);
+}
+
+.data-panel .list-actions,
+.list-options-panel .control-grid {
+  margin-top: 0;
+}
+
+.select-box {
+  display: none;
+}
+
+.tagged-meta {
+  gap: 0;
+}

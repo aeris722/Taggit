@@ -94,11 +94,11 @@ const VIEW_MODES = new Set([
   "archived",
 ]);
 const STATUS_LABELS = {
-  new: "New",
+  new: "Active",
   "follow-up": "Follow up",
   waiting: "Waiting",
-  opportunity: "Opportunity",
-  closed: "Closed",
+  opportunity: "Important",
+  closed: "Done",
 };
 const STATUS_TIMEOUT_MS = 2200;
 const DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
@@ -206,7 +206,7 @@ function setTheme(theme = "dark") {
   const nextTheme = theme === "light" ? "light" : DEFAULT_UI_PREFS.theme;
   uiPrefs = { ...uiPrefs, theme: nextTheme };
   document.documentElement.dataset.theme = nextTheme;
-  els.themeToggleBtn.textContent = nextTheme === "light" ? "L" : "D";
+  els.themeToggleBtn.textContent = nextTheme === "light" ? "☀" : "☾";
   els.themeToggleBtn.dataset.state = nextTheme;
   els.themeToggleBtn.title = nextTheme === "light" ? "Light theme" : "Dark theme";
   els.themeToggleBtn.setAttribute("aria-pressed", String(nextTheme === "light"));
@@ -220,7 +220,7 @@ function setDensity(density = "comfortable") {
   const nextDensity = density === "compact" ? "compact" : DEFAULT_UI_PREFS.density;
   uiPrefs = { ...uiPrefs, density: nextDensity };
   document.documentElement.dataset.density = nextDensity;
-  els.densityToggleBtn.textContent = nextDensity === "compact" ? "C" : "N";
+  els.densityToggleBtn.textContent = nextDensity === "compact" ? "▦" : "↕";
   els.densityToggleBtn.dataset.state = nextDensity;
   els.densityToggleBtn.title = nextDensity === "compact" ? "Compact density" : "Normal density";
   els.densityToggleBtn.setAttribute("aria-pressed", String(nextDensity === "compact"));
@@ -583,14 +583,6 @@ function createTaggedItem(item) {
   statusBadge.textContent = getStatusLabel(item.status);
   detailRow.appendChild(statusBadge);
 
-  const health = getRelationshipHealth(item);
-  const healthBadge = document.createElement("span");
-  healthBadge.className = "meta-chip health-chip";
-  healthBadge.dataset.health = health.label.toLowerCase().replace(/\s+/g, "-");
-  healthBadge.textContent = `${health.score} · ${health.label}`;
-  healthBadge.title = "Relationship health score based on recency, follow-up age, status, notes, and next-step clarity.";
-  detailRow.appendChild(healthBadge);
-
   if (hasFollowUp(item)) {
     const followUpBadge = document.createElement("span");
     followUpBadge.className = "meta-chip follow-up-chip";
@@ -610,20 +602,6 @@ function createTaggedItem(item) {
     desc.textContent = item.description;
     listItem.appendChild(desc);
   }
-
-  const memory = createRelationshipMemory(item);
-  const memoryBox = document.createElement("div");
-  memoryBox.className = "relationship-memory";
-  const memoryTitle = document.createElement("span");
-  memoryTitle.className = "memory-title";
-  memoryTitle.textContent = "Memory";
-  const memoryText = document.createElement("p");
-  memoryText.textContent = memory.suggestedNextAction;
-  const topics = document.createElement("span");
-  topics.className = "subtle-text";
-  topics.textContent = memory.keyTopics.length ? `Topics: ${memory.keyTopics.join(", ")}` : "Topics: none yet";
-  memoryBox.append(memoryTitle, memoryText, topics);
-  listItem.appendChild(memoryBox);
 
   listItem.appendChild(createOpenChatButton(getBestChatHref(item), "link-btn"));
 
@@ -843,7 +821,7 @@ function renderList() {
   els.clearFilterBtn.hidden = !filterText.trim() && !activeTagFilter;
   renderStats();
   renderCommandCenter();
-  renderWeeklyReview();
+  if (els.weeklyReviewGrid) renderWeeklyReview();
   renderTagSuggestions();
   renderTagCloud();
   renderBulkToolbar(filtered);
@@ -1133,6 +1111,11 @@ async function copySummary() {
   }
 }
 
+function getScopedPreferenceIds(tags, preferenceIds = []) {
+  const exportedKeys = new Set((Array.isArray(tags) ? tags : []).map(getItemKey));
+  return (Array.isArray(preferenceIds) ? preferenceIds : []).filter((id) => exportedKeys.has(id));
+}
+
 function exportTags(tags = getFilteredConversations()) {
   const exportedTags = Array.isArray(tags) ? tags : getFilteredConversations();
   if (!exportedTags.length) return;
@@ -1140,6 +1123,10 @@ function exportTags(tags = getFilteredConversations()) {
   const payload = {
     exportedAt: new Date().toISOString(),
     count: exportedTags.length,
+    preferences: {
+      archivedIds: getScopedPreferenceIds(exportedTags, uiPrefs.archivedIds),
+      pinnedIds: getScopedPreferenceIds(exportedTags, uiPrefs.pinnedIds),
+    },
     tags: exportedTags,
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -1327,10 +1314,33 @@ async function importTagsFromFile(file) {
     const byId = new Map(taggedConversations.map((tag) => [getItemKey(tag), tag]));
     incoming.forEach((tag) => {
       const key = getItemKey(tag);
-      if (key) byId.set(key, tag);
+      if (!key) return;
+
+      const existing = byId.get(key);
+      if (!existing || (tag.updatedAt || tag.createdAt || 0) >= (existing.updatedAt || existing.createdAt || 0)) {
+        byId.set(key, tag);
+      }
     });
+
+    const incomingKeys = new Set(incoming.map(getItemKey).filter(Boolean));
+    const incomingPreferences = payload?.preferences && typeof payload.preferences === "object"
+      ? payload.preferences
+      : {};
+    const importedPinnedIds = Array.isArray(incomingPreferences.pinnedIds)
+      ? incomingPreferences.pinnedIds.filter((id) => incomingKeys.has(id))
+      : [];
+    const importedArchivedIds = Array.isArray(incomingPreferences.archivedIds)
+      ? incomingPreferences.archivedIds.filter((id) => incomingKeys.has(id))
+      : [];
+
     taggedConversations = normalizeTags([...byId.values()]);
+    uiPrefs = {
+      ...uiPrefs,
+      archivedIds: [...new Set([...(uiPrefs.archivedIds || []), ...importedArchivedIds])],
+      pinnedIds: [...new Set([...(uiPrefs.pinnedIds || []), ...importedPinnedIds])],
+    };
     await save();
+    await saveUiPrefs();
     renderList();
     syncFormWithCurrentContext();
     setStatus(`${incoming.length} tags imported.`, "success");
@@ -1694,7 +1704,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 els.form.addEventListener("submit", onSubmit);
 els.list.addEventListener("click", onClickList);
 els.dailyActionList.addEventListener("click", onClickList);
-els.askResults.addEventListener("click", onClickList);
+els.askResults?.addEventListener("click", onClickList);
 document.querySelectorAll("[data-view-shortcut]").forEach((button) => {
   button.addEventListener("click", async () => {
     viewMode = getValidViewMode(button.dataset.viewShortcut);
@@ -1781,12 +1791,13 @@ els.noteTemplates.addEventListener("click", (event) => {
   updateCounters();
   els.descInput.focus();
 });
-els.askBtn.addEventListener("click", askTaggit);
-els.askInput.addEventListener("keydown", (event) => {
+els.askBtn?.addEventListener("click", askTaggit);
+els.askInput?.addEventListener("keydown", (event) => {
   if (event.key === "Enter") askTaggit();
 });
 document.querySelectorAll("[data-ask]").forEach((button) => {
   button.addEventListener("click", () => {
+    if (!els.askInput) return;
     els.askInput.value = button.dataset.ask || "";
     askTaggit();
   });

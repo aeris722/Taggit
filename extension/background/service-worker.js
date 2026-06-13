@@ -31,10 +31,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   switch (message?.type) {
     case MESSAGE_TYPES.openChat: {
       const fallbackUrl = "https://www.reddit.com/chat/";
-      const url =
-        getSafeChatHref?.(message) ||
-        getBestChatHref(message) ||
-        fallbackUrl;
+      const url = getBestChatHref(message) || fallbackUrl;
 
       chrome.tabs
         .create({ url })
@@ -72,9 +69,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return false;
       }
 
-      const href =
-        getSafeChatHref?.(message) ||
-        getBestChatHref(message);
+      const href = getBestChatHref(message);
 
       const context = {
         username: message.username || "Unknown",
