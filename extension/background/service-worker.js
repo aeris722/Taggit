@@ -5,7 +5,6 @@ const { MESSAGE_TYPES } = globalThis.TaggitConstants;
 const {
   getBestChatHref,
   getConversationId,
-  getSafeChatHref,
   saveContext,
 } = globalThis.TaggitStorage;
 
